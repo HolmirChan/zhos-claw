@@ -5,6 +5,7 @@ import (
 
 	"github.com/sipeed/picoclaw/cmd/picoclaw/internal"
 	"github.com/sipeed/picoclaw/cmd/picoclaw/internal/cliui"
+	"github.com/sipeed/picoclaw/pkg"
 	"github.com/sipeed/picoclaw/pkg/config"
 )
 
@@ -23,5 +24,5 @@ func NewVersionCommand() *cobra.Command {
 
 func printVersion() {
 	build, goVer := config.FormatBuildInfo()
-	cliui.PrintVersion(internal.Logo, "picoclaw "+config.FormatVersion(), build, goVer)
+	cliui.PrintVersion(internal.Logo, pkg.AppName+" "+config.FormatVersion(), build, goVer)
 }

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sipeed/picoclaw/pkg"
 	"github.com/sipeed/picoclaw/pkg/config"
 	"github.com/sipeed/picoclaw/pkg/memory"
 	"github.com/sipeed/picoclaw/pkg/providers"
@@ -778,7 +779,7 @@ func (h *Handler) sessionRuntimeSettings() (string, int, error) {
 func resolveSessionsDir(workspace string) string {
 	if workspace == "" {
 		home, _ := os.UserHomeDir()
-		workspace = filepath.Join(home, ".picoclaw", "workspace")
+		workspace = filepath.Join(home, pkg.DefaultPicoClawHome, "workspace")
 	}
 
 	// Expand ~ prefix

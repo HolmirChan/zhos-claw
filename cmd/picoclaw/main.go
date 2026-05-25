@@ -26,6 +26,7 @@ import (
 	"github.com/sipeed/picoclaw/cmd/picoclaw/internal/skills"
 	"github.com/sipeed/picoclaw/cmd/picoclaw/internal/status"
 	"github.com/sipeed/picoclaw/cmd/picoclaw/internal/version"
+	"github.com/sipeed/picoclaw/pkg"
 	"github.com/sipeed/picoclaw/pkg/config"
 	"github.com/sipeed/picoclaw/pkg/updater"
 )
@@ -52,18 +53,16 @@ func earlyColorDisabled() bool {
 }
 
 func NewPicoclawCommand() *cobra.Command {
-	short := fmt.Sprintf("%s PicoClaw — personal AI assistant", internal.Logo)
-	long := fmt.Sprintf(`%s PicoClaw is a lightweight personal AI assistant.
-
-Version: %s`, internal.Logo, config.FormatVersion())
+	short := fmt.Sprintf("%s %s — personal AI assistant", internal.Logo, pkg.AppName)
+	long := fmt.Sprintf("%s %s is a lightweight personal AI assistant.\n\nVersion: %s", internal.Logo, pkg.AppName, config.FormatVersion())
 
 	cmd := &cobra.Command{
-		Use:   "picoclaw",
+		Use:   pkg.CommandName,
 		Short: short,
 		Long:  long,
-		Example: `picoclaw version
-picoclaw onboard
-picoclaw --no-color status`,
+		Example: pkg.CommandName + ` version
+` + pkg.CommandName + ` onboard
+` + pkg.CommandName + ` --no-color status`,
 		SilenceErrors: true,
 		// Avoid plain UsageString() on stderr/stdout when a command fails; cliui
 		// renders matching panels on stderr instead.
@@ -92,7 +91,7 @@ picoclaw --no-color status`,
 		migrate.NewMigrateCommand(),
 		skills.NewSkillsCommand(),
 		model.NewModelCommand(),
-		updater.NewUpdateCommand("picoclaw"),
+		updater.NewUpdateCommand(pkg.CommandName),
 		version.NewVersionCommand(),
 	)
 
@@ -103,20 +102,20 @@ const (
 	colorBlue = "\033[1;38;2;62;93;185m"
 	colorRed  = "\033[1;38;2;213;70;70m"
 	banner    = "\r\n" +
-		colorBlue + "██████╗ ██╗ ██████╗ ██████╗ " + colorRed + " ██████╗██╗      █████╗ ██╗    ██╗\n" +
-		colorBlue + "██╔══██╗██║██╔════╝██╔═══██╗" + colorRed + "██╔════╝██║     ██╔══██╗██║    ██║\n" +
-		colorBlue + "██████╔╝██║██║     ██║   ██║" + colorRed + "██║     ██║     ███████║██║ █╗ ██║\n" +
-		colorBlue + "██╔═══╝ ██║██║     ██║   ██║" + colorRed + "██║     ██║     ██╔══██║██║███╗██║\n" +
-		colorBlue + "██║     ██║╚██████╗╚██████╔╝" + colorRed + "╚██████╗███████╗██║  ██║╚███╔███╔╝\n" +
-		colorBlue + "╚═╝     ╚═╝ ╚═════╝ ╚═════╝ " + colorRed + " ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝\n " +
+		colorBlue + "███████╗██╗   ██╗ ██████╗ ███████╗ " + colorRed + " ██████╗██╗      █████╗ ██╗    ██╗\n" +
+		colorBlue + "╚════██║██║   ██║██╔═══██╗██╔════╝" + colorRed + "██╔════╝██║     ██╔══██╗██║    ██║\n" +
+		colorBlue + "   ██╔╝ ████████║██║   ██║███████╗" + colorRed + "██║     ██║     ███████║██║ █╗ ██║\n" +
+		colorBlue + "  ██╔╝  ██╔═══██║██║   ██║╚════██║" + colorRed + "██║     ██║     ██╔══██║██║███╗██║\n" +
+		colorBlue + "███████╗██║   ██║╚██████╔╝███████║" + colorRed + "╚██████╗███████╗██║  ██║╚███╔███╔╝\n" +
+		colorBlue + "╚══════╝╚═╝   ╚═╝ ╚═════╝ ╚══════╝ " + colorRed + " ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝\n " +
 		"\033[0m\r\n"
 	plainBanner = "\r\n" +
-		"██████╗ ██╗ ██████╗ ██████╗  ██████╗██╗      █████╗ ██╗    ██╗\n" +
-		"██╔══██╗██║██╔════╝██╔═══██╗██╔════╝██║     ██╔══██╗██║    ██║\n" +
-		"██████╔╝██║██║     ██║   ██║██║     ██║     ███████║██║ █╗ ██║\n" +
-		"██╔═══╝ ██║██║     ██║   ██║██║     ██║     ██╔══██║██║███╗██║\n" +
-		"██║     ██║╚██████╗╚██████╔╝╚██████╗███████╗██║  ██║╚███╔███╔╝\n" +
-		"╚═╝     ╚═╝ ╚═════╝ ╚═════╝  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝\n " +
+		"███████╗██╗   ██╗ ██████╗ ███████╗  ██████╗██╗      █████╗ ██╗    ██╗\n" +
+		"╚════██║██║   ██║██╔═══██╗██╔════╝██╔════╝██║     ██╔══██╗██║    ██║\n" +
+		"   ██╔╝ ████████║██║   ██║███████╗██║     ██║     ███████║██║ █╗ ██║\n" +
+		"  ██╔╝  ██╔═══██║██║   ██║╚════██║██║     ██║     ██╔══██║██║███╗██║\n" +
+		"███████╗██║   ██║╚██████╔╝███████║╚██████╗███████╗██║  ██║╚███╔███╔╝\n" +
+		"╚══════╝╚═╝   ╚═╝ ╚═════╝ ╚══════╝  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝\n " +
 		"\r\n"
 )
 

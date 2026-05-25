@@ -1,9 +1,9 @@
 .PHONY: all build install uninstall clean help test integration-test build-all lint-docs
 
 # Build variables
-BINARY_NAME=picoclaw
+BINARY_NAME=zhosclaw
 BUILD_DIR=build
-CMD_DIR=cmd/$(BINARY_NAME)
+CMD_DIR=cmd/picoclaw
 MAIN_GO=$(CMD_DIR)/main.go
 EXT=
 

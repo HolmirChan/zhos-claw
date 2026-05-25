@@ -18,7 +18,7 @@ func DefaultSSHKeyPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("credential: cannot determine home directory: %w", err)
 	}
-	return filepath.Join(home, ".ssh", "picoclaw_ed25519.key"), nil
+	return filepath.Join(home, ".ssh", "zhosclaw_ed25519.key"), nil
 }
 
 // GenerateSSHKey generates an Ed25519 SSH key pair and writes the private key

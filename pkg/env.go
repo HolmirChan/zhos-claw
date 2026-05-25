@@ -5,8 +5,17 @@ package pkg
 const (
 	Logo = "🦞"
 	// AppName is the name of the app
-	AppName = "PicoClaw"
+	AppName = "ZhosClaw"
+)
 
-	DefaultPicoClawHome = ".picoclaw"
-	WorkspaceName       = "workspace"
+// DefaultPicoClawHome is the default home directory name.
+// Overridable at compile time via -ldflags.
+var DefaultPicoClawHome = ".zhosclaw"
+
+// CommandName is the CLI command name (lowercase).
+// Overridable at compile time via -ldflags.
+var CommandName = "zhosclaw"
+
+const (
+	WorkspaceName = "workspace"
 )
