@@ -4,25 +4,26 @@ set -e
 DEVICE_IP=${DEVICE_IP:-"192.168.1.100"}
 DEVICE_USER=${DEVICE_USER:-"root"}
 REMOTE_DIR="/opt/zhosclaw"
+SSH_OPTS="-o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new"
 
 echo "==> Building for RK3506..."
 make build-rk3506
 
 echo "==> Stopping existing processes on $DEVICE_IP..."
-ssh "${DEVICE_USER}@${DEVICE_IP}" "mkdir -p ${REMOTE_DIR} && \
+ssh ${SSH_OPTS} "${DEVICE_USER}@${DEVICE_IP}" "mkdir -p ${REMOTE_DIR} && \
     pkill -f zhosclaw || true && \
     pkill -f picoclaw-launcher || true"
 
 echo "==> Uploading binaries..."
-scp build/zhosclaw-linux-arm           "${DEVICE_USER}@${DEVICE_IP}:${REMOTE_DIR}/zhosclaw"
-scp build/picoclaw-launcher-linux-arm  "${DEVICE_USER}@${DEVICE_IP}:${REMOTE_DIR}/picoclaw-launcher"
+scp ${SSH_OPTS} build/zhosclaw-linux-arm           "${DEVICE_USER}@${DEVICE_IP}:${REMOTE_DIR}/zhosclaw"
+scp ${SSH_OPTS} build/picoclaw-launcher-linux-arm  "${DEVICE_USER}@${DEVICE_IP}:${REMOTE_DIR}/picoclaw-launcher"
 
 echo "==> Starting services..."
-ssh "${DEVICE_USER}@${DEVICE_IP}" "cd ${REMOTE_DIR} && \
+ssh ${SSH_OPTS} "${DEVICE_USER}@${DEVICE_IP}" "cd ${REMOTE_DIR} && \
     chmod +x zhosclaw picoclaw-launcher && \
-    nohup ./zhosclaw gateway > gateway.log 2>&1 & \
+    nohup ./zhosclaw gateway >> gateway.log 2>&1 & \
     sleep 2 && \
-    nohup ./picoclaw-launcher > launcher.log 2>&1 & \
+    nohup ./picoclaw-launcher >> launcher.log 2>&1 & \
     echo 'Services started'"
 
 echo ""
