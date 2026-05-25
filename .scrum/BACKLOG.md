@@ -14,7 +14,7 @@
   - [x] 本机运行后 `localhost:18800` 聊天界面可用，发「执行 echo hello_rk3506_test」Agent 返回结果
   - [ ] `deploy-rk3506.sh` 推包到设备后，局域网浏览器访问 RK3506 IP:18800 可用（待真机验证）
   - [ ] 发「执行 ls /tmp」Agent 返回目录列表（待真机验证）
-  - [ ] Web UI 二进制重命名为 `zhosclaw-web`（含平台变体），`appName` 引用 `pkg.AppName`
+  - [x] Web UI 二进制重命名为 `zhosclaw-web`（含平台变体），`appName` 引用 `pkg.AppName`
 
 ## 已交付
 
