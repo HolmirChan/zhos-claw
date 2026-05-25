@@ -37,12 +37,12 @@
 - **来源**: BL-004
 - **子任务**:
   - [x] 确认本机 config 已 onboard（或执行 onboard）
-  - [x] 启动 picoclaw-launcher（自动管理 gateway，无需手动启动 gateway）
+  - [x] 启动 zhosclaw-web（自动管理 gateway，无需手动启动 gateway）
   - [x] 浏览器打开 localhost:18800，确认聊天界面加载
   - [x] 发送「执行 echo hello_rk3506_test」，确认 Agent 回复包含该字符串
   - [x] 停止本机进程
 - **阻塞**: SB-002 完成后
-- **备注**: 发现并修复 rebrand 遗留 bug（FindPicoclawBinary 硬编码 "picoclaw"）；token 由 gateway 运行时生成写入 PID 文件，launcher 自动读取，config.json 无需手动配置
+- **备注**: 发现并修复 rebrand 遗留 bug（FindPicoclawBinary 硬编码 "picoclaw"）；token 由 gateway 运行时生成写入 PID 文件，launcher 自动读取，config.json 无需手动配置；SB-006 完成后以 `./build/zhosclaw-web` 重新验证通过
 
 ### SB-006 · 将 Web UI 二进制重命名为 zhosclaw-web [x]
 - **来源**: BL-004
