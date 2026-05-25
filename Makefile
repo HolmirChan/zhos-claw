@@ -313,6 +313,21 @@ build-android-bundle: generate
 build-pi-zero: build-linux-arm build-linux-arm64
 	@echo "Pi Zero 2 W builds: $(BUILD_DIR)/$(BINARY_NAME)-linux-arm (32-bit), $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 (64-bit)"
 
+## build-rk3506: Build for RK3506 (linux/arm GOARM=7) + local debug binaries
+build-rk3506: build-linux-arm
+	@echo "Building picoclaw-launcher for linux/arm (RK3506)..."
+	@mkdir -p $(BUILD_DIR)
+	GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 \
+		go build -v -tags stdjson -ldflags "$(LDFLAGS)" \
+		-o $(BUILD_DIR)/picoclaw-launcher-linux-arm ./web/backend
+	@echo "Build complete: $(BUILD_DIR)/picoclaw-launcher-linux-arm"
+	$(MAKE) build build-launcher
+	@echo "RK3506 build complete. Artifacts:"
+	@echo "  $(BUILD_DIR)/$(BINARY_NAME)-linux-arm          (RK3506)"
+	@echo "  $(BUILD_DIR)/picoclaw-launcher-linux-arm       (RK3506)"
+	@echo "  $(BUILD_DIR)/$(BINARY_NAME)                    (local debug)"
+	@echo "  $(BUILD_DIR)/picoclaw-launcher                 (local debug)"
+
 ## build-all: Build the picoclaw core binary for all Makefile-managed platforms
 build-all: generate
 	@echo "Building for multiple platforms..."
