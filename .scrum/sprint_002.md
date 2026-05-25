@@ -64,7 +64,7 @@
 - **来源**: BL-004
 - **子任务**:
   - [ ] 将 RK3506 接入局域网，确认 SSH 可达（`ssh root@<DEVICE_IP>`）
-  - [ ] 在 RK3506 上执行 `picoclaw onboard`（或手动初始化 `~/.zhosclaw/config.json`，填入 API Key）
+  - [ ] 在 RK3506 上执行 `zhosclaw onboard`（或手动初始化 `~/.zhosclaw/config.json`，填入 API Key）
   - [ ] 执行 `DEVICE_IP=<ip> bash scripts/deploy-rk3506.sh`，确认 4 个步骤无报错
   - [ ] 局域网另一台设备浏览器打开 `http://<DEVICE_IP>:18800`，确认聊天界面加载
   - [ ] 发送「执行 ls /tmp」，确认 Agent 返回目录列表
