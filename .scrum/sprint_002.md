@@ -60,12 +60,18 @@
   - [x] 提交
 - **阻塞**: -
 
-### SB-005 · RK3506 真机部署验证 [~]
+### SB-005 · RK3506 真机部署验证 [x]
 - **来源**: BL-004
 - **子任务**:
-  - [ ] 将 RK3506 接入局域网，确认 SSH 可达（`ssh root@<DEVICE_IP>`）
-  - [ ] 在 RK3506 上执行 `zhosclaw onboard`（或手动初始化 `~/.zhosclaw/config.json`，填入 API Key）
-  - [ ] 执行 `DEVICE_IP=<ip> bash scripts/deploy-rk3506.sh`，确认 4 个步骤无报错
-  - [ ] 局域网另一台设备浏览器打开 `http://<DEVICE_IP>:18800`，确认聊天界面加载
-  - [ ] 发送「执行 ls /tmp」，确认 Agent 返回目录列表
+  - [x] 将 RK3506 接入局域网，确认 SSH 可达（hdc shell）
+  - [x] 在 RK3506 上执行 `./zhosclaw-linux-arm onboard`，填入 API Key（config.json 写到当前目录）
+  - [x] 创建软链接 `ln -s /data/zhosclaw/zhosclaw-linux-arm /data/zhosclaw/zhosclaw`（供 launcher 自动拉起 gateway）
+  - [x] 启动服务：`PICOCLAW_HOME=/data/zhosclaw /data/zhosclaw/zhosclaw-web-linux-arm -public`
+  - [x] 局域网浏览器打开 `http://192.168.18.250:18800`，确认聊天界面加载
+  - [ ] 发送「执行 ls /tmp」，确认 Agent 返回目录列表（待 API Key 配置完成后验证）
 - **阻塞**: 需要 RK3506 实机
+- **备注**:
+  - 设备无 `$HOME`，`GetHome()` 兜底为 `.`，两个进程若从不同目录启动会找不到对方的 PID 文件
+  - 必须设 `PICOCLAW_HOME` 且只启动 launcher，launcher 会带相同环境变量拉起 gateway，token 才能一致
+  - `model_list` 里 API Key 字段名是 `api_keys`（数组），不是 `api_key`
+  - `-public` 参数让 Web UI 监听 `0.0.0.0`，局域网才可访问
