@@ -1,10 +1,18 @@
 # Backlog
 
-> 当前迭代: -
+> 当前迭代: sprint_002.md
 
 ## 待规划
 
-（暂无条目）
+### BL-004 · OpenHarmony L1 (RK3506) 适配 MVP
+- **意图**: 让 ZhosClaw 在 RK3506（ARM Cortex-A7，Linux）上运行，局域网内浏览器访问 Web UI，自然语言驱动 Agent 执行 shell 命令
+- **方案方向**: 新增 `build-rk3506` Makefile target（GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0）+ 一键部署脚本；利用已有 ExecTool 实现 shell 执行；Web UI 使用现有 picoclaw-launcher
+- **设计文档**: `docs/superpowers/specs/2026-05-25-openharmony-l1-rk3506-design.md`
+- **验收标准**:
+  - [ ] `make build-rk3506` 产出 4 个产物（2 个 ARM 二进制 + 2 个本机调试二进制）
+  - [ ] 本机运行后 `localhost:3000` 聊天界面可用，发「执行 echo hello」Agent 返回 hello
+  - [ ] `deploy-rk3506.sh` 推包到设备后，局域网浏览器访问 RK3506 IP:3000 可用
+  - [ ] 发「执行 ls /tmp」Agent 返回目录列表
 
 ## 已交付
 
