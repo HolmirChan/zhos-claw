@@ -215,23 +215,23 @@ else
 endif
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)$(EXT)"
 
-## build-launcher: Build the picoclaw-launcher (web console) binary
+## build-launcher: Build the zhosclaw-web (web console) binary
 build-launcher:
-	@echo "Building picoclaw-launcher for $(PLATFORM)/$(ARCH)..."
+	@echo "Building zhosclaw-web for $(PLATFORM)/$(ARCH)..."
 ifeq ($(OS),Windows_NT)
 	@$(POWERSHELL) "New-Item -ItemType Directory -Force -Path '$(BUILD_DIR)' | Out-Null"
-	@$(MAKE) -C web build PLATFORM="$(PLATFORM)" ARCH="$(ARCH)" EXT="$(EXT)" OUTPUT="$(CURDIR)/$(BUILD_DIR)/picoclaw-launcher-$(PLATFORM)-$(ARCH)$(EXT)" GO_BUILD_TAGS="$(GO_BUILD_TAGS)"
-	@$(POWERSHELL) "Copy-Item -LiteralPath '$(BUILD_DIR)/picoclaw-launcher-$(PLATFORM)-$(ARCH)$(EXT)' -Destination '$(BUILD_DIR)/picoclaw-launcher$(EXT)' -Force"
+	@$(MAKE) -C web build PLATFORM="$(PLATFORM)" ARCH="$(ARCH)" EXT="$(EXT)" OUTPUT="$(CURDIR)/$(BUILD_DIR)/zhosclaw-web-$(PLATFORM)-$(ARCH)$(EXT)" GO_BUILD_TAGS="$(GO_BUILD_TAGS)"
+	@$(POWERSHELL) "Copy-Item -LiteralPath '$(BUILD_DIR)/zhosclaw-web-$(PLATFORM)-$(ARCH)$(EXT)' -Destination '$(BUILD_DIR)/zhosclaw-web$(EXT)' -Force"
 else
 	@mkdir -p $(BUILD_DIR)
 	@GOOS=$(PLATFORM) GOARCH=$(ARCH) $(MAKE) -C web build \
-		OUTPUT="$(CURDIR)/$(BUILD_DIR)/picoclaw-launcher-$(PLATFORM)-$(ARCH)$(EXT)" \
+		OUTPUT="$(CURDIR)/$(BUILD_DIR)/zhosclaw-web-$(PLATFORM)-$(ARCH)$(EXT)" \
 		WEB_GO='$(WEB_GO)' \
 		GO_BUILD_TAGS='$(GO_BUILD_TAGS)' \
 		LDFLAGS='$(LDFLAGS)'
-	@$(LNCMD) picoclaw-launcher-$(PLATFORM)-$(ARCH)$(EXT) $(BUILD_DIR)/picoclaw-launcher$(EXT)
+	@$(LNCMD) zhosclaw-web-$(PLATFORM)-$(ARCH)$(EXT) $(BUILD_DIR)/zhosclaw-web$(EXT)
 endif
-	@echo "Build complete: $(BUILD_DIR)/picoclaw-launcher$(EXT)"
+	@echo "Build complete: $(BUILD_DIR)/zhosclaw-web$(EXT)"
 
 build-launcher-frontend:
 	@$(MAKE) -C web build-frontend
@@ -285,13 +285,13 @@ build-android-arm64: generate
 
 ## build-launcher-android-arm64: Build launcher for Android ARM64
 build-launcher-android-arm64:
-	@echo "Building picoclaw-launcher for android/arm64..."
+	@echo "Building zhosclaw-web for android/arm64..."
 	@mkdir -p $(BUILD_DIR)
 	@$(MAKE) -C web build-android-arm64 \
-		OUTPUT_ANDROID_ARM64="$(CURDIR)/$(BUILD_DIR)/picoclaw-launcher-android-arm64" \
+		OUTPUT_ANDROID_ARM64="$(CURDIR)/$(BUILD_DIR)/zhosclaw-web-android-arm64" \
 		GO='$(GO)' \
 		LDFLAGS='$(LDFLAGS)'
-	@echo "Build complete: $(BUILD_DIR)/picoclaw-launcher-android-arm64"
+	@echo "Build complete: $(BUILD_DIR)/zhosclaw-web-android-arm64"
 
 ## build-android-bundle: Build core and launcher for all Android architectures and package as universal zip
 build-android-bundle: generate
@@ -304,7 +304,7 @@ build-android-bundle: generate
 	@rm -rf $(BUILD_DIR)/android-staging
 	@mkdir -p $(BUILD_DIR)/android-staging/arm64-v8a
 	@cp $(BUILD_DIR)/$(BINARY_NAME)-android-arm64 $(BUILD_DIR)/android-staging/arm64-v8a/libpicoclaw.so
-	@cp $(BUILD_DIR)/picoclaw-launcher-android-arm64 $(BUILD_DIR)/android-staging/arm64-v8a/libpicoclaw-web.so
+	@cp $(BUILD_DIR)/zhosclaw-web-android-arm64 $(BUILD_DIR)/android-staging/arm64-v8a/libpicoclaw-web.so
 	@cd $(BUILD_DIR)/android-staging && zip -r ../picoclaw-android-universal.zip .
 	@rm -rf $(BUILD_DIR)/android-staging
 	@echo "All Android builds complete: $(BUILD_DIR)/picoclaw-android-universal.zip"
@@ -315,18 +315,18 @@ build-pi-zero: build-linux-arm build-linux-arm64
 
 ## build-rk3506: Build for RK3506 (linux/arm GOARM=7) + local debug binaries
 build-rk3506: build-linux-arm build-launcher-frontend
-	@echo "Building picoclaw-launcher for linux/arm (RK3506)..."
+	@echo "Building zhosclaw-web for linux/arm (RK3506)..."
 	@mkdir -p $(BUILD_DIR)
 	GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 \
 		go build -v -tags stdjson -ldflags "$(LDFLAGS)" \
-		-o $(BUILD_DIR)/picoclaw-launcher-linux-arm ./web/backend
-	@echo "Build complete: $(BUILD_DIR)/picoclaw-launcher-linux-arm"
+		-o $(BUILD_DIR)/zhosclaw-web-linux-arm ./web/backend
+	@echo "Build complete: $(BUILD_DIR)/zhosclaw-web-linux-arm"
 	$(MAKE) build build-launcher
 	@echo "RK3506 build complete. Artifacts:"
 	@echo "  $(BUILD_DIR)/$(BINARY_NAME)-linux-arm          (RK3506)"
-	@echo "  $(BUILD_DIR)/picoclaw-launcher-linux-arm       (RK3506)"
+	@echo "  $(BUILD_DIR)/zhosclaw-web-linux-arm       (RK3506)"
 	@echo "  $(BUILD_DIR)/$(BINARY_NAME)                    (local debug)"
-	@echo "  $(BUILD_DIR)/picoclaw-launcher                 (local debug)"
+	@echo "  $(BUILD_DIR)/zhosclaw-web                 (local debug)"
 
 ## build-all: Build the picoclaw core binary for all Makefile-managed platforms
 build-all: generate

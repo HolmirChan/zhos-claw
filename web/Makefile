@@ -18,8 +18,8 @@ export GOTOOLCHAIN
 # Build variables
 BUILD_DIR=build
 EXT=
-OUTPUT?=$(BUILD_DIR)/picoclaw-launcher$(EXT)
-OUTPUT_ANDROID_ARM64?=$(BUILD_DIR)/picoclaw-launcher-android-arm64$(EXT)
+OUTPUT?=$(BUILD_DIR)/zhosclaw-web$(EXT)
+OUTPUT_ANDROID_ARM64?=$(BUILD_DIR)/zhosclaw-web-android-arm64$(EXT)
 FRONTEND_DIR=frontend
 FRONTEND_INSTALL_STAMP=$(FRONTEND_DIR)/node_modules/.picoclaw-install-stamp
 BACKEND_DIR=backend
@@ -159,7 +159,7 @@ ifeq ($(OS),Windows_NT)
 else
 	@mkdir -p $(BUILD_DIR)
 endif
-	GOOS=android GOARCH=arm64 $(GO) build -tags stdjson -ldflags "$(LDFLAGS)" -o "$(BUILD_DIR)/picoclaw-launcher-android-arm64" ./$(BACKEND_DIR)/
+	GOOS=android GOARCH=arm64 $(GO) build -tags stdjson -ldflags "$(LDFLAGS)" -o "$(BUILD_DIR)/zhosclaw-web-android-arm64" ./$(BACKEND_DIR)/
 	@echo "All Android launcher builds complete"
 
 build-frontend:

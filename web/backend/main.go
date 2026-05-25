@@ -26,6 +26,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sipeed/picoclaw/pkg"
 	"github.com/sipeed/picoclaw/pkg/config"
 	"github.com/sipeed/picoclaw/pkg/logger"
 	"github.com/sipeed/picoclaw/pkg/netbind"
@@ -37,7 +38,7 @@ import (
 )
 
 const (
-	appName = "PicoClaw"
+	appName = pkg.AppName
 
 	logPath   = "logs"
 	panicFile = "launcher_panic.log"

@@ -44,7 +44,7 @@
 - **阻塞**: SB-002 完成后
 - **备注**: 发现并修复 rebrand 遗留 bug（FindPicoclawBinary 硬编码 "picoclaw"）；token 由 gateway 运行时生成写入 PID 文件，launcher 自动读取，config.json 无需手动配置
 
-### SB-006 · 将 Web UI 二进制重命名为 zhosclaw-web [ ]
+### SB-006 · 将 Web UI 二进制重命名为 zhosclaw-web [x]
 - **来源**: BL-004
 - **改动范围**:
   - `web/Makefile` — `OUTPUT` 默认值从 `picoclaw-launcher` 改为 `zhosclaw-web`
@@ -52,12 +52,12 @@
   - `web/backend/main.go:40` — `appName = "PicoClaw"` 改为 `appName = pkg.AppName`（需 import `github.com/sipeed/picoclaw/pkg`）
   - `scripts/deploy-rk3506.sh` — scp 源文件名从 `picoclaw-launcher-linux-arm` 改为 `zhosclaw-web-linux-arm`
 - **子任务**:
-  - [ ] 修改 `web/Makefile`
-  - [ ] 修改根 `Makefile`（build-launcher、build-rk3506 及相关 echo）
-  - [ ] 修改 `web/backend/main.go` appName
-  - [ ] 修改 `scripts/deploy-rk3506.sh`
-  - [ ] `make build-rk3506`，确认产物名称正确
-  - [ ] 提交
+  - [x] 修改 `web/Makefile`
+  - [x] 修改根 `Makefile`（build-launcher、build-rk3506 及相关 echo）
+  - [x] 修改 `web/backend/main.go` appName（`"PicoClaw"` → `pkg.AppName`）
+  - [x] 修改 `scripts/deploy-rk3506.sh`
+  - [x] `make build-rk3506`，确认产物名称正确
+  - [x] 提交
 - **阻塞**: -
 
 ### SB-005 · RK3506 真机部署验证 [~]

@@ -12,18 +12,18 @@ make build-rk3506
 echo "==> Stopping existing processes on $DEVICE_IP..."
 ssh ${SSH_OPTS} "${DEVICE_USER}@${DEVICE_IP}" "mkdir -p ${REMOTE_DIR} && \
     pkill -f zhosclaw || true && \
-    pkill -f picoclaw-launcher || true"
+    pkill -f zhosclaw-web || true"
 
 echo "==> Uploading binaries..."
 scp ${SSH_OPTS} build/zhosclaw-linux-arm           "${DEVICE_USER}@${DEVICE_IP}:${REMOTE_DIR}/zhosclaw"
-scp ${SSH_OPTS} build/picoclaw-launcher-linux-arm  "${DEVICE_USER}@${DEVICE_IP}:${REMOTE_DIR}/picoclaw-launcher"
+scp ${SSH_OPTS} build/zhosclaw-web-linux-arm  "${DEVICE_USER}@${DEVICE_IP}:${REMOTE_DIR}/zhosclaw-web"
 
 echo "==> Starting services..."
 ssh ${SSH_OPTS} "${DEVICE_USER}@${DEVICE_IP}" "cd ${REMOTE_DIR} && \
-    chmod +x zhosclaw picoclaw-launcher && \
+    chmod +x zhosclaw zhosclaw-web && \
     nohup ./zhosclaw gateway >> gateway.log 2>&1 & \
     sleep 2 && \
-    nohup ./picoclaw-launcher >> launcher.log 2>&1 & \
+    nohup ./zhosclaw-web >> launcher.log 2>&1 & \
     echo 'Services started'"
 
 echo ""
