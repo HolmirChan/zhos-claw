@@ -314,7 +314,7 @@ build-pi-zero: build-linux-arm build-linux-arm64
 	@echo "Pi Zero 2 W builds: $(BUILD_DIR)/$(BINARY_NAME)-linux-arm (32-bit), $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 (64-bit)"
 
 ## build-rk3506: Build for RK3506 (linux/arm GOARM=7) + local debug binaries
-build-rk3506: build-linux-arm
+build-rk3506: build-linux-arm build-launcher-frontend
 	@echo "Building picoclaw-launcher for linux/arm (RK3506)..."
 	@mkdir -p $(BUILD_DIR)
 	GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 \
