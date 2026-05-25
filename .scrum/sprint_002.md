@@ -3,7 +3,7 @@
 > 创建: 2026-05-25
 > 目标版本: -
 > 来源: BACKLOG.md（BL-004）
-> 状态: 进行中
+> 状态: 已完成
 
 ## 任务清单
 
@@ -33,13 +33,13 @@
   - [x] 提交（含 SSH_OPTS 超时保护、日志追加模式修复）
 - **阻塞**: -
 
-### SB-004 · 本机冒烟验证 [~]
+### SB-004 · 本机冒烟验证 [x]
 - **来源**: BL-004
 - **子任务**:
-  - [ ] 确认本机 config 已 onboard（或执行 onboard）
-  - [ ] 后台启动 gateway
-  - [ ] 后台启动 picoclaw-launcher
-  - [ ] 浏览器打开 localhost:3000，确认聊天界面加载
-  - [ ] 发送「执行 echo hello_rk3506_test」，确认 Agent 回复包含该字符串
-  - [ ] 停止本机进程
+  - [x] 确认本机 config 已 onboard（或执行 onboard）
+  - [x] 启动 picoclaw-launcher（自动管理 gateway，无需手动启动 gateway）
+  - [x] 浏览器打开 localhost:18800，确认聊天界面加载
+  - [x] 发送「执行 echo hello_rk3506_test」，确认 Agent 回复包含该字符串
+  - [x] 停止本机进程
 - **阻塞**: SB-002 完成后
+- **备注**: 发现并修复 rebrand 遗留 bug（FindPicoclawBinary 硬编码 "picoclaw"）；token 由 gateway 运行时生成写入 PID 文件，launcher 自动读取，config.json 无需手动配置
