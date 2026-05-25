@@ -21,11 +21,11 @@
 - **方案方向**: 追踪每条 CLI 命令的代码执行路径，顺带吃透 `pkg/config/`、`pkg/credential/`、`pkg/identity/` 基础设施包
 - **已完成于**: sprint_001.md
 - **验收标准**:
-  - [ ] 能画出 onboard 的完整数据流（嵌入 → 拷贝 → 加密写入）
-  - [ ] 理解 config 的 SecureString 三种格式（plaintext / file:// / enc://）和序列化流程
-  - [ ] 理解 credential.Resolver 的解析链和 credential.Encrypt 的密钥派生链
-  - [ ] 能画出 gateway 启动时的模块依赖图（channels 注册、pid 锁、bus 初始化）
-  - [ ] 能画出 agent 的 pipeline 请求处理流程（setup → llm → execute → streaming → finalize）
+  - [x] 能画出 onboard 的完整数据流（嵌入 → 拷贝 → 加密写入）
+  - [x] 理解 config 的 SecureString 三种格式（plaintext / file:// / enc://）和序列化流程
+  - [x] 理解 credential.Resolver 的解析链和 credential.Encrypt 的密钥派生链
+  - [x] 能画出 gateway 启动时的模块依赖图（channels 注册、pid 锁、bus 初始化）
+  - [x] 能画出 agent 的 pipeline 请求处理流程（setup → llm → execute → streaming → finalize）
 
 ### BL-002 · 深入核心模块 — agent 管道、providers 抽象、channels 架构、seahorse 记忆
 - **意图**: 能接手核心引擎的开发，理解四个最关键模块的内部组织、关键数据结构和扩展点

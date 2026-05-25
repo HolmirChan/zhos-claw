@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/sipeed/picoclaw/pkg"
 	"github.com/sipeed/picoclaw/pkg/config"
 	"github.com/sipeed/picoclaw/pkg/logger"
 )
@@ -31,11 +32,11 @@ func GetDefaultConfigPath() string {
 // Search order:
 //  1. PICOCLAW_BINARY environment variable (explicit override)
 //  2. Same directory as the current executable
-//  3. Falls back to "picoclaw" and relies on $PATH
+//  3. Falls back to pkg.CommandName and relies on $PATH
 func FindPicoclawBinary() string {
-	binaryName := "picoclaw"
+	binaryName := pkg.CommandName
 	if runtime.GOOS == "windows" {
-		binaryName = "picoclaw.exe"
+		binaryName = pkg.CommandName + ".exe"
 	}
 
 	if p := os.Getenv(config.EnvBinary); p != "" {
