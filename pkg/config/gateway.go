@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/sipeed/picoclaw/pkg"
 	"github.com/sipeed/picoclaw/pkg/logger"
 	"github.com/sipeed/picoclaw/pkg/netbind"
 )
@@ -91,7 +92,7 @@ func ResolveGatewayLogLevel(path string) string {
 		_ = json.Unmarshal(data, &cfg)
 	}
 
-	if envLevel := os.Getenv("PICOCLAW_LOG_LEVEL"); envLevel != "" {
+	if envLevel := pkg.GetEnv("LOG_LEVEL"); envLevel != "" {
 		cfg.Gateway.LogLevel = envLevel
 	}
 

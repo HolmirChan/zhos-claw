@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/caarlos0/env/v11"
 	"gopkg.in/yaml.v3"
 
+	"github.com/sipeed/picoclaw/pkg"
 	"github.com/sipeed/picoclaw/pkg/logger"
 )
 
@@ -750,17 +750,17 @@ func applyTelegramStreamingEnvCompat(target any) {
 		return
 	}
 
-	if raw, ok := os.LookupEnv("PICOCLAW_CHANNELS_TELEGRAM_STREAMING_ENABLED"); ok {
+	if raw, ok := pkg.LookupEnv("CHANNELS_TELEGRAM_STREAMING_ENABLED"); ok {
 		if value, err := strconv.ParseBool(raw); err == nil {
 			settings.Streaming.Enabled = value
 		}
 	}
-	if raw, ok := os.LookupEnv("PICOCLAW_CHANNELS_TELEGRAM_STREAMING_THROTTLE_SECONDS"); ok {
+	if raw, ok := pkg.LookupEnv("CHANNELS_TELEGRAM_STREAMING_THROTTLE_SECONDS"); ok {
 		if value, err := strconv.Atoi(raw); err == nil {
 			settings.Streaming.ThrottleSeconds = value
 		}
 	}
-	if raw, ok := os.LookupEnv("PICOCLAW_CHANNELS_TELEGRAM_STREAMING_MIN_GROWTH_CHARS"); ok {
+	if raw, ok := pkg.LookupEnv("CHANNELS_TELEGRAM_STREAMING_MIN_GROWTH_CHARS"); ok {
 		if value, err := strconv.Atoi(raw); err == nil {
 			settings.Streaming.MinGrowthChars = value
 		}

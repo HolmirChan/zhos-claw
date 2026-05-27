@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
+	"github.com/sipeed/picoclaw/pkg"
 	"golang.org/x/term"
 )
 
@@ -218,7 +219,7 @@ func DisableFileLogging() {
 }
 
 func ConfigureFromEnv() {
-	if logFile := os.Getenv("PICOCLAW_LOG_FILE"); logFile != "" {
+	if logFile := pkg.GetEnv("LOG_FILE"); logFile != "" {
 		if strings.HasPrefix(logFile, "~/") {
 			if home := os.Getenv("HOME"); home != "" {
 				logFile = filepath.Join(home, logFile[2:])

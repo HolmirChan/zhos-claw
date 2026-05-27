@@ -38,11 +38,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/sipeed/picoclaw/pkg"
 )
 
 // PassphraseEnvVar is the environment variable that holds the encryption passphrase.
 // Other packages (e.g. config) reference this constant to avoid duplicating the string.
-const PassphraseEnvVar = "PICOCLAW_KEY_PASSPHRASE"
+var PassphraseEnvVar = pkg.EnvPrefix + "KEY_PASSPHRASE"
 
 // PassphraseProvider is the function used to retrieve the passphrase for enc://
 // credential decryption. It defaults to reading PICOCLAW_KEY_PASSPHRASE from the
@@ -68,11 +70,11 @@ var ErrDecryptionFailed = errors.New("credential: enc:// decryption failed (wron
 
 // SSHKeyPathEnvVar is the environment variable that specifies the path to the
 // SSH private key used for enc:// credential encryption and decryption.
-const SSHKeyPathEnvVar = "PICOCLAW_SSH_KEY_PATH"
+var SSHKeyPathEnvVar = pkg.EnvPrefix + "SSH_KEY_PATH"
 
 // picoclawHome is a package-local copy of config.EnvHome. It is kept here to
 // avoid a circular import between pkg/credential and pkg/config.
-const picoclawHome = "PICOCLAW_HOME"
+var picoclawHome = pkg.EnvPrefix + "HOME"
 
 const (
 	FileScheme = "file://"
