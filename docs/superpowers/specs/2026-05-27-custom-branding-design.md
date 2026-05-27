@@ -96,21 +96,38 @@ func envOptions() env.Options {
 
 ## Makefile 改动
 
-新增 `CUSTOM_PREFIX` 变量，默认 `PICOCLAW_`：
+新增品牌变量 + 跨平台 sed + 校验 + 精确 struct tag 替换宏：
 
 ```makefile
 CUSTOM_PREFIX ?= PICOCLAW_
+CUSTOM_HOME   ?= .picoclaw
+CUSTOM_CMD    ?= picoclaw
+CUSTOM_APP    ?= PicoClaw
+CUSTOM_LOGO   ?= 🦞
 
-build:
-    # 拷贝到临时目录
-    cp -r pkg cmd /tmp/build-custom/
-    # 替换前缀
-    find /tmp/build-custom -name '*.go' -exec sed -i '' 's/PICOCLAW_/$(CUSTOM_PREFIX)/g' {} +
-    # 编译（ldflags 注入 EnvPrefix 变量值）
-    go build -ldflags "-X github.com/sipeed/picoclaw/pkg.EnvPrefix=$(CUSTOM_PREFIX)" ...
-    # 清理
-    rm -rf /tmp/build-custom
+# 跨平台 sed in-place 选项
+SED_INPLACE := $(if $(shell sed --version 2>/dev/null | head -1 | grep -qi gnu && echo 1),-i,-i '')
+
+# 校验 CUSTOM_PREFIX 不含 sed 特殊字符
+define validate-prefix
+	@case "$(CUSTOM_PREFIX)" in */*|*\&*) echo "ERROR: invalid char in CUSTOM_PREFIX" >&2; exit 1 ;; esac
+endef
+
+# 编译宏：临时副本中精确替换 struct tag 前缀，PID 隔离防并发
+define build-with-custom-prefix
+	$(call validate-prefix)
+	@mkdir -p $(BUILD_DIR)/custom-build.$$$$
+	@cp -r cmd pkg web go.mod go.sum $(BUILD_DIR)/custom-build.$$$$/
+	@if [ "$(CUSTOM_PREFIX)" != "PICOCLAW_" ]; then \
+		find $(BUILD_DIR)/custom-build.$$$$ -name '*.go' \
+			-exec sed $(SED_INPLACE) 's/envPrefix:"PICOCLAW_/envPrefix:"$(CUSTOM_PREFIX)/g' {} + ; \
+	fi
+	cd $(BUILD_DIR)/custom-build.$$$$ && $(GO) build ... -o $(1) ./cmd/picoclaw
+	@rm -rf $(BUILD_DIR)/custom-build.$$$$
+endef
 ```
+
+LDFLAGS 追加品牌变量注入：`-X github.com/sipeed/picoclaw/pkg.EnvPrefix=$(CUSTOM_PREFIX)` 等 5 项。
 
 ## 改动范围概览
 

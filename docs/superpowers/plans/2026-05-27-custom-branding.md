@@ -95,6 +95,8 @@ Co-Authored-By: Claude Code"
 
 - [ ] **Step 1: 修改 envkeys.go**
 
+`pkg.EnvPrefix` 是 `var`（支持 ldflags 覆盖），Go 不允许 `const` 引用 `var`，因此 envkeys 的 key 定义也必须是 `var`：
+
 ```go
 package config
 
@@ -105,12 +107,12 @@ import (
 	"github.com/sipeed/picoclaw/pkg"
 )
 
-const (
-	EnvHome         = pkg.EnvPrefix + "HOME"
-	EnvConfig       = pkg.EnvPrefix + "CONFIG"
-	EnvBuiltinSkills = pkg.EnvPrefix + "BUILTIN_SKILLS"
-	EnvBinary       = pkg.EnvPrefix + "BINARY"
-	EnvGatewayHost  = pkg.EnvPrefix + "GATEWAY_HOST"
+var (
+	EnvHome          = pkg.EnvPrefix + "HOME"
+	EnvConfig        = pkg.EnvPrefix + "CONFIG"
+	EnvBuiltinSkills  = pkg.EnvPrefix + "BUILTIN_SKILLS"
+	EnvBinary        = pkg.EnvPrefix + "BINARY"
+	EnvGatewayHost   = pkg.EnvPrefix + "GATEWAY_HOST"
 )
 
 func GetHome() string {
@@ -127,19 +129,7 @@ func GetHome() string {
 }
 ```
 
-注意：常量定义不能再使用 `const` 块（因为 `pkg.EnvPrefix` 是 var），需要改为 `var` 块或用 `var` 单独声明。但 `const` 块中变量可以在编译期确定... 实际上 Go 不允许 `const` 引用 `var`。这里需要灵活处理：如果 `EnvPrefix` 通过 ldflags 注入，编译后是固定值，但 Go 语言层面它仍是 `var`。因此常量需改为 `var`：
-
-```go
-var (
-	EnvHome         = pkg.EnvPrefix + "HOME"
-	EnvConfig       = pkg.EnvPrefix + "CONFIG"
-	EnvBuiltinSkills = pkg.EnvPrefix + "BUILTIN_SKILLS"
-	EnvBinary       = pkg.EnvPrefix + "BINARY"
-	EnvGatewayHost  = pkg.EnvPrefix + "GATEWAY_HOST"
-)
-```
-
-同时检查所有引用这几个常量的地方 —— 如果它们被用作 `const` 上下文（如其他 `const` 声明、switch case 标签），需要调整。当前用法均为 `os.Getenv(EnvHome)` 等函数调用参数，`var` 完全兼容。
+检查所有引用这几个 key 的地方 —— 当前用法均为 `os.Getenv(EnvHome)` 等函数调用参数，`var` 完全兼容。
 
 - [ ] **Step 2: 验证编译**
 
@@ -686,9 +676,17 @@ Expected: 全量测试通过（若有测试失败需检查并修复）
 - [ ] **Step 3: 二进制泄露检查**
 
 ```bash
-strings build/zhosclaw | grep 'PICOCLAW_' | head -10
+# 统计 PICOCLAW_ 在二进制中的出现次数。
+# GetEnv/LookupEnv 中 2 处 + envOptions 中 2 处 = 最多 4 处有意保留的 fallback 字符串。
+# 若超过 4 次说明 struct tag 或其他位置未被正确替换。
+COUNT=$(strings build/zhosclaw | grep -c 'PICOCLAW_' || true)
+if [ "$COUNT" -le 4 ]; then
+    echo "PASS: PICOCLAW_ occurrences: $COUNT (accepted)"
+else
+    echo "FAIL: PICOCLAW_ found $COUNT times (max 4 allowed)"
+    exit 1
+fi
 ```
-Expected: 零结果（默认构建）或仅有 fallback 函数中的字符串（自定义构建）
 
 - [ ] **Step 4: 源码干净检查**
 
@@ -699,8 +697,8 @@ grep -rn 'envPrefix:"PICOCLAW_' pkg/config/
 Expected: 有输出（源码中 struct tag 保持默认值）
 
 ```bash
-# 非 struct-tag 的 PICOCLAW_ 只应在 pkg/env.go 中出现
-grep -rn 'PICOCLAW_' pkg/ cmd/ web/backend/ --include='*.go' | grep -v 'envPrefix:"PICOCLAW_' | grep -v 'pkg/env.go'
+# 非 struct-tag 的 PICOCLAW_ 只应在 pkg/env.go 和 pkg/config/envkeys.go 的 envOptions() 中出现
+grep -rn 'PICOCLAW_' pkg/ cmd/ web/backend/ --include='*.go' | grep -v 'envPrefix:"PICOCLAW_' | grep -v 'pkg/env.go' | grep -v 'pkg/config/envkeys.go'
 ```
 Expected: 零结果（或仅注释中出现）
 
@@ -718,13 +716,12 @@ make test
 echo "=== 3. Building with custom prefix ==="
 CUSTOM_PREFIX=ZHOSCLAW_ CUSTOM_HOME=.zhosclaw CUSTOM_CMD=zhosclaw make build
 echo "=== 4. Binary residue check ==="
-# 统计 PICOCLAW_ 出现次数。GetEnv/LookupEnv 中有意保留的 fallback 字符串会导致 2 次出现（默认构建）
-# 或 0 次（自定义构建时 struct tag 被替换）。允许 ≤2 次，超过则报 FAIL。
+# GetEnv 2 处 + envOptions 2 处 = 最多 4 处有意保留的 fallback 字符串
 COUNT=$(strings build/zhosclaw | grep -c 'PICOCLAW_' || true)
-if [ "$COUNT" -le 2 ]; then
-    echo "PASS: PICOCLAW_ occurrences in binary: $COUNT (<= 2 allowed for fallback)"
+if [ "$COUNT" -le 4 ]; then
+    echo "PASS: PICOCLAW_ occurrences: $COUNT"
 else
-    echo "FAIL: PICOCLAW_ found $COUNT times in binary (max 2 allowed)"
+    echo "FAIL: PICOCLAW_ found $COUNT times (max 4 allowed)"
     exit 1
 fi
 echo "=== All checks passed ==="
