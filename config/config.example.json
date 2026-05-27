@@ -2,7 +2,7 @@
   "version": 3,
   "agents": {
     "defaults": {
-      "workspace": "~/.zhosclaw/workspace",
+      "workspace": "~/.zaiagent/workspace",
       "restrict_to_workspace": true,
       "model_name": "deepseek-v4-flash",
       "max_tokens": 128000,
