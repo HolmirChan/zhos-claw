@@ -9,10 +9,10 @@ import (
 	"github.com/sipeed/picoclaw/pkg/logger"
 )
 
-const Logo = pkg.Logo
+var Logo = pkg.Logo
 
-// GetPicoclawHome returns the picoclaw home directory.
-// Priority: $PICOCLAW_HOME > ~/.picoclaw
+// GetPicoclawHome returns the home directory.
+// Priority: $ENV_PREFIX_HOME > ~/.picoclaw
 func GetPicoclawHome() string {
 	return config.GetHome()
 }
