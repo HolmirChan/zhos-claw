@@ -69,7 +69,7 @@ define validate-prefix
 	esac
 endef
 
-# Build macro: copies source to temp dir, sed-replaces envPrefix struct tags, compiles, cleans up.
+# Build macro: copies source to temp dir, sed-replaces envPrefix and env struct tags, compiles, cleans up.
 define build-with-custom-prefix
 	$(call validate-prefix)
 	@rm -rf $(BUILD_DIR)/custom-build
@@ -77,7 +77,9 @@ define build-with-custom-prefix
 	@cp -r cmd pkg web go.mod go.sum $(BUILD_DIR)/custom-build/
 	@if [ "$(CUSTOM_PREFIX)" != "PICOCLAW_" ]; then \
 		echo "  Applying custom prefix to struct tags: $(CUSTOM_PREFIX)"; \
-		find $(BUILD_DIR)/custom-build -name '*.go' -exec sed $(SED_INPLACE) 's/envPrefix:"PICOCLAW_/envPrefix:"$(CUSTOM_PREFIX)/g' {} + ; \
+		find $(BUILD_DIR)/custom-build -name '*.go' -exec sed $(SED_INPLACE) \
+			-e 's/envPrefix:"PICOCLAW_/envPrefix:"$(CUSTOM_PREFIX)/g' \
+			-e 's/env:"PICOCLAW_/env:"$(CUSTOM_PREFIX)/g' {} + ; \
 	fi
 	cd $(BUILD_DIR)/custom-build && $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(1) ./cmd/picoclaw
 	@rm -rf $(BUILD_DIR)/custom-build
