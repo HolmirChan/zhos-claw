@@ -55,6 +55,7 @@
 - **来源**: BL-005
 - **子任务**:
   - [ ] `cmd/picoclaw/dns_noresolv.go` — env 读取改用 `pkg.GetEnv`
+  - [ ] `cmd/picoclaw/main.go` — 包注释 `// PicoClaw - Ultra-lightweight...` 改为通用描述
   - [ ] `cmd/picoclaw/internal/helpers.go` — 路径引用修正
   - [ ] `cmd/picoclaw/internal/migrate/command.go` — 路径引用修正
   - [ ] 验证编译通过并提交
