@@ -1,7 +1,14 @@
 .PHONY: all build install uninstall clean help test integration-test build-all lint-docs
 
+# Brand customization (defaults for this project: ZhosClaw)
+CUSTOM_PREFIX ?= ZHOSCLAW_
+CUSTOM_HOME   ?= .zhosclaw
+CUSTOM_CMD    ?= zhosclaw
+CUSTOM_APP    ?= ZhosClaw
+CUSTOM_LOGO   ?= 🦞
+
 # Build variables
-BINARY_NAME=zhosclaw
+BINARY_NAME ?= $(CUSTOM_CMD)
 BUILD_DIR=build
 CMD_DIR=cmd/picoclaw
 MAIN_GO=$(CMD_DIR)/main.go
@@ -29,7 +36,7 @@ GIT_COMMIT=$(if $(GIT_COMMIT_RAW),$(GIT_COMMIT_RAW),dev)
 BUILD_TIME=$(if $(BUILD_TIME_RAW),$(BUILD_TIME_RAW),dev)
 GO_VERSION=$(if $(GO_VERSION_RAW),$(GO_VERSION_RAW),unknown)
 CONFIG_PKG=github.com/sipeed/picoclaw/pkg/config
-LDFLAGS=-X $(CONFIG_PKG).Version=$(VERSION) -X $(CONFIG_PKG).GitCommit=$(GIT_COMMIT) -X $(CONFIG_PKG).BuildTime=$(BUILD_TIME) -X $(CONFIG_PKG).GoVersion=$(GO_VERSION) -s -w
+LDFLAGS=-X $(CONFIG_PKG).Version=$(VERSION) -X $(CONFIG_PKG).GitCommit=$(GIT_COMMIT) -X $(CONFIG_PKG).BuildTime=$(BUILD_TIME) -X $(CONFIG_PKG).GoVersion=$(GO_VERSION) -X github.com/sipeed/picoclaw/pkg.EnvPrefix=$(CUSTOM_PREFIX) -X github.com/sipeed/picoclaw/pkg.DefaultHome=$(CUSTOM_HOME) -X github.com/sipeed/picoclaw/pkg.CommandName=$(CUSTOM_CMD) -X github.com/sipeed/picoclaw/pkg.AppName=$(CUSTOM_APP) -X github.com/sipeed/picoclaw/pkg.Logo=$(CUSTOM_LOGO) -s -w
 
 # Go variables
 GO?=go
@@ -49,6 +56,32 @@ empty:=
 space:=$(empty) $(empty)
 GO_BUILD_TAGS_NO_GOOLM:=$(subst $(space),$(comma),$(strip $(filter-out goolm,$(subst $(comma),$(space),$(GO_BUILD_TAGS)))))
 GOFLAGS_NO_GOOLM?=-v -tags $(GO_BUILD_TAGS_NO_GOOLM)
+
+# Cross-platform sed in-place option (BSD on macOS, GNU on Linux)
+SED_INPLACE := $(if $(shell sed --version 2>/dev/null | head -1 | grep -qi gnu && echo 1),-i,-i '')
+
+# Validate CUSTOM_PREFIX doesn't contain sed-special characters
+define validate-prefix
+	@case "$(CUSTOM_PREFIX)" in \
+		*/*) echo "ERROR: CUSTOM_PREFIX must not contain '/': $(CUSTOM_PREFIX)" >&2; exit 1 ;; \
+		*\&*) echo "ERROR: CUSTOM_PREFIX must not contain '&': $(CUSTOM_PREFIX)" >&2; exit 1 ;; \
+		*) ;; \
+	esac
+endef
+
+# Build macro: copies source to temp dir, sed-replaces envPrefix struct tags, compiles, cleans up.
+define build-with-custom-prefix
+	$(call validate-prefix)
+	@rm -rf $(BUILD_DIR)/custom-build
+	@mkdir -p $(BUILD_DIR)/custom-build
+	@cp -r cmd pkg web go.mod go.sum $(BUILD_DIR)/custom-build/
+	@if [ "$(CUSTOM_PREFIX)" != "PICOCLAW_" ]; then \
+		echo "  Applying custom prefix to struct tags: $(CUSTOM_PREFIX)"; \
+		find $(BUILD_DIR)/custom-build -name '*.go' -exec sed $(SED_INPLACE) 's/envPrefix:"PICOCLAW_/envPrefix:"$(CUSTOM_PREFIX)/g' {} + ; \
+	fi
+	cd $(BUILD_DIR)/custom-build && $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(1) ./cmd/picoclaw
+	@rm -rf $(BUILD_DIR)/custom-build
+endef
 
 # Patch MIPS LE ELF e_flags (offset 36) for NaN2008-only kernels (e.g. Ingenic X2600).
 #
@@ -200,8 +233,9 @@ else
 endif
 	@echo "Run generate complete"
 
-## build: Build the picoclaw binary for current platform
+## build: Build the binary for current platform
 build: generate
+	$(call validate-prefix)
 	@echo "Building $(BINARY_NAME)$(EXT) for $(PLATFORM)/$(ARCH)..."
 ifeq ($(OS),Windows_NT)
 	@$(POWERSHELL) "New-Item -ItemType Directory -Force -Path '$(BUILD_DIR)' | Out-Null"
@@ -209,29 +243,28 @@ ifeq ($(OS),Windows_NT)
 	@$(POWERSHELL) "Copy-Item -LiteralPath '$(BINARY_PATH)$(EXT)' -Destination '$(BUILD_DIR)/$(BINARY_NAME)$(EXT)' -Force"
 else
 	@mkdir -p $(BUILD_DIR)
-	@GOOS=$(PLATFORM) GOARCH=$(ARCH) $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BINARY_PATH)$(EXT) ./$(CMD_DIR)
-	@echo "Build complete: $(BINARY_PATH)$(EXT)"
+	$(call build-with-custom-prefix,$(abspath $(BINARY_PATH)$(EXT)))
 	@$(LNCMD) $(BINARY_NAME)-$(PLATFORM)-$(ARCH)$(EXT) $(BUILD_DIR)/$(BINARY_NAME)$(EXT)
 endif
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)$(EXT)"
 
-## build-launcher: Build the zhosclaw-web (web console) binary
+## build-launcher: Build the web console binary
 build-launcher:
-	@echo "Building zhosclaw-web for $(PLATFORM)/$(ARCH)..."
+	@echo "Building $(CUSTOM_CMD)-web for $(PLATFORM)/$(ARCH)..."
 ifeq ($(OS),Windows_NT)
 	@$(POWERSHELL) "New-Item -ItemType Directory -Force -Path '$(BUILD_DIR)' | Out-Null"
-	@$(MAKE) -C web build PLATFORM="$(PLATFORM)" ARCH="$(ARCH)" EXT="$(EXT)" OUTPUT="$(CURDIR)/$(BUILD_DIR)/zhosclaw-web-$(PLATFORM)-$(ARCH)$(EXT)" GO_BUILD_TAGS="$(GO_BUILD_TAGS)"
-	@$(POWERSHELL) "Copy-Item -LiteralPath '$(BUILD_DIR)/zhosclaw-web-$(PLATFORM)-$(ARCH)$(EXT)' -Destination '$(BUILD_DIR)/zhosclaw-web$(EXT)' -Force"
+	@$(MAKE) -C web build PLATFORM="$(PLATFORM)" ARCH="$(ARCH)" EXT="$(EXT)" OUTPUT="$(CURDIR)/$(BUILD_DIR)/$(CUSTOM_CMD)-web-$(PLATFORM)-$(ARCH)$(EXT)" GO_BUILD_TAGS="$(GO_BUILD_TAGS)"
+	@$(POWERSHELL) "Copy-Item -LiteralPath '$(BUILD_DIR)/$(CUSTOM_CMD)-web-$(PLATFORM)-$(ARCH)$(EXT)' -Destination '$(BUILD_DIR)/$(CUSTOM_CMD)-web$(EXT)' -Force"
 else
 	@mkdir -p $(BUILD_DIR)
 	@GOOS=$(PLATFORM) GOARCH=$(ARCH) $(MAKE) -C web build \
-		OUTPUT="$(CURDIR)/$(BUILD_DIR)/zhosclaw-web-$(PLATFORM)-$(ARCH)$(EXT)" \
+		OUTPUT="$(CURDIR)/$(BUILD_DIR)/$(CUSTOM_CMD)-web-$(PLATFORM)-$(ARCH)$(EXT)" \
 		WEB_GO='$(WEB_GO)' \
 		GO_BUILD_TAGS='$(GO_BUILD_TAGS)' \
 		LDFLAGS='$(LDFLAGS)'
-	@$(LNCMD) zhosclaw-web-$(PLATFORM)-$(ARCH)$(EXT) $(BUILD_DIR)/zhosclaw-web$(EXT)
+	@$(LNCMD) $(CUSTOM_CMD)-web-$(PLATFORM)-$(ARCH)$(EXT) $(BUILD_DIR)/$(CUSTOM_CMD)-web$(EXT)
 endif
-	@echo "Build complete: $(BUILD_DIR)/zhosclaw-web$(EXT)"
+	@echo "Build complete: $(BUILD_DIR)/$(CUSTOM_CMD)-web$(EXT)"
 
 build-launcher-frontend:
 	@$(MAKE) -C web build-frontend
@@ -285,13 +318,13 @@ build-android-arm64: generate
 
 ## build-launcher-android-arm64: Build launcher for Android ARM64
 build-launcher-android-arm64:
-	@echo "Building zhosclaw-web for android/arm64..."
+	@echo "Building $(CUSTOM_CMD)-web for android/arm64..."
 	@mkdir -p $(BUILD_DIR)
 	@$(MAKE) -C web build-android-arm64 \
-		OUTPUT_ANDROID_ARM64="$(CURDIR)/$(BUILD_DIR)/zhosclaw-web-android-arm64" \
+		OUTPUT_ANDROID_ARM64="$(CURDIR)/$(BUILD_DIR)/$(CUSTOM_CMD)-web-android-arm64" \
 		GO='$(GO)' \
 		LDFLAGS='$(LDFLAGS)'
-	@echo "Build complete: $(BUILD_DIR)/zhosclaw-web-android-arm64"
+	@echo "Build complete: $(BUILD_DIR)/$(CUSTOM_CMD)-web-android-arm64"
 
 ## build-android-bundle: Build core and launcher for all Android architectures and package as universal zip
 build-android-bundle: generate
@@ -304,7 +337,7 @@ build-android-bundle: generate
 	@rm -rf $(BUILD_DIR)/android-staging
 	@mkdir -p $(BUILD_DIR)/android-staging/arm64-v8a
 	@cp $(BUILD_DIR)/$(BINARY_NAME)-android-arm64 $(BUILD_DIR)/android-staging/arm64-v8a/libpicoclaw.so
-	@cp $(BUILD_DIR)/zhosclaw-web-android-arm64 $(BUILD_DIR)/android-staging/arm64-v8a/libpicoclaw-web.so
+	@cp $(BUILD_DIR)/$(CUSTOM_CMD)-web-android-arm64 $(BUILD_DIR)/android-staging/arm64-v8a/libpicoclaw-web.so
 	@cd $(BUILD_DIR)/android-staging && zip -r ../picoclaw-android-universal.zip .
 	@rm -rf $(BUILD_DIR)/android-staging
 	@echo "All Android builds complete: $(BUILD_DIR)/picoclaw-android-universal.zip"
@@ -315,18 +348,18 @@ build-pi-zero: build-linux-arm build-linux-arm64
 
 ## build-rk3506: Build for RK3506 (linux/arm GOARM=7) + local debug binaries
 build-rk3506: build-linux-arm build-launcher-frontend
-	@echo "Building zhosclaw-web for linux/arm (RK3506)..."
+	@echo "Building $(CUSTOM_CMD)-web for linux/arm (RK3506)..."
 	@mkdir -p $(BUILD_DIR)
 	GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 \
 		go build -v -tags stdjson -ldflags "$(LDFLAGS)" \
-		-o $(BUILD_DIR)/zhosclaw-web-linux-arm ./web/backend
-	@echo "Build complete: $(BUILD_DIR)/zhosclaw-web-linux-arm"
+		-o $(BUILD_DIR)/$(CUSTOM_CMD)-web-linux-arm ./web/backend
+	@echo "Build complete: $(BUILD_DIR)/$(CUSTOM_CMD)-web-linux-arm"
 	$(MAKE) build build-launcher
 	@echo "RK3506 build complete. Artifacts:"
 	@echo "  $(BUILD_DIR)/$(BINARY_NAME)-linux-arm          (RK3506)"
-	@echo "  $(BUILD_DIR)/zhosclaw-web-linux-arm       (RK3506)"
+	@echo "  $(BUILD_DIR)/$(CUSTOM_CMD)-web-linux-arm       (RK3506)"
 	@echo "  $(BUILD_DIR)/$(BINARY_NAME)                    (local debug)"
-	@echo "  $(BUILD_DIR)/zhosclaw-web                 (local debug)"
+	@echo "  $(BUILD_DIR)/$(CUSTOM_CMD)-web                 (local debug)"
 
 ## build-all: Build the picoclaw core binary for all Makefile-managed platforms
 build-all: generate
