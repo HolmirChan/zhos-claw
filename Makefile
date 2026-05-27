@@ -1,11 +1,11 @@
 .PHONY: all build install uninstall clean help test integration-test build-all lint-docs
 
-# Brand customization (defaults for this project: ZhosClaw)
-CUSTOM_PREFIX ?= ZHOSCLAW_
-CUSTOM_HOME   ?= .zhosclaw
-CUSTOM_CMD    ?= zhosclaw
-CUSTOM_APP    ?= ZhosClaw
-CUSTOM_LOGO   ?= 🦞
+# Read branding values from pkg/env.go — the single source of truth.
+# Change values in pkg/env.go, not here.
+CUSTOM_PREFIX := $(shell grep 'EnvPrefix' pkg/env.go | grep -o '"[A-Z_]*"' | tr -d '"')
+CUSTOM_HOME   := $(shell grep 'DefaultHome' pkg/env.go | grep -o '"\.[a-z]*"' | tr -d '"')
+CUSTOM_CMD    := $(shell grep 'CommandName' pkg/env.go | grep -o '"[a-z]*"' | tr -d '"')
+CUSTOM_APP    := $(shell grep 'AppName' pkg/env.go | grep -o '"[A-Za-z]*"' | tr -d '"')
 
 # Build variables
 BINARY_NAME ?= $(CUSTOM_CMD)
@@ -36,7 +36,7 @@ GIT_COMMIT=$(if $(GIT_COMMIT_RAW),$(GIT_COMMIT_RAW),dev)
 BUILD_TIME=$(if $(BUILD_TIME_RAW),$(BUILD_TIME_RAW),dev)
 GO_VERSION=$(if $(GO_VERSION_RAW),$(GO_VERSION_RAW),unknown)
 CONFIG_PKG=github.com/sipeed/picoclaw/pkg/config
-LDFLAGS=-X $(CONFIG_PKG).Version=$(VERSION) -X $(CONFIG_PKG).GitCommit=$(GIT_COMMIT) -X $(CONFIG_PKG).BuildTime=$(BUILD_TIME) -X $(CONFIG_PKG).GoVersion=$(GO_VERSION) -X github.com/sipeed/picoclaw/pkg.EnvPrefix=$(CUSTOM_PREFIX) -X github.com/sipeed/picoclaw/pkg.DefaultHome=$(CUSTOM_HOME) -X github.com/sipeed/picoclaw/pkg.CommandName=$(CUSTOM_CMD) -X github.com/sipeed/picoclaw/pkg.AppName=$(CUSTOM_APP) -X github.com/sipeed/picoclaw/pkg.Logo=$(CUSTOM_LOGO) -s -w
+LDFLAGS=-X $(CONFIG_PKG).Version=$(VERSION) -X $(CONFIG_PKG).GitCommit=$(GIT_COMMIT) -X $(CONFIG_PKG).BuildTime=$(BUILD_TIME) -X $(CONFIG_PKG).GoVersion=$(GO_VERSION) -s -w
 
 # Go variables
 GO?=go
@@ -69,20 +69,19 @@ define validate-prefix
 	esac
 endef
 
-# Build macro: copies source to temp dir, sed-replaces envPrefix and env struct tags, compiles, cleans up.
+# Apply custom prefix to struct tags via sed, build, then restore ONLY the files sed changed.
 define build-with-custom-prefix
 	$(call validate-prefix)
-	@rm -rf $(BUILD_DIR)/custom-build
-	@mkdir -p $(BUILD_DIR)/custom-build
-	@cp -r cmd pkg web go.mod go.sum $(BUILD_DIR)/custom-build/
 	@if [ "$(CUSTOM_PREFIX)" != "PICOCLAW_" ]; then \
 		echo "  Applying custom prefix to struct tags: $(CUSTOM_PREFIX)"; \
-		find $(BUILD_DIR)/custom-build -name '*.go' -exec sed $(SED_INPLACE) \
+		find pkg cmd web/backend -name '*.go' ! -name '*_test.go' -exec sed $(SED_INPLACE) \
 			-e 's/envPrefix:"PICOCLAW_/envPrefix:"$(CUSTOM_PREFIX)/g' \
 			-e 's/env:"PICOCLAW_/env:"$(CUSTOM_PREFIX)/g' {} + ; \
 	fi
-	cd $(BUILD_DIR)/custom-build && $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(1) ./cmd/picoclaw
-	@rm -rf $(BUILD_DIR)/custom-build
+	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(1) ./$(CMD_DIR)
+	@if [ "$(CUSTOM_PREFIX)" != "PICOCLAW_" ]; then \
+		git diff --name-only pkg/ cmd/ web/backend/ | xargs -r git checkout -- 2>/dev/null || true; \
+	fi
 endef
 
 # Patch MIPS LE ELF e_flags (offset 36) for NaN2008-only kernels (e.g. Ingenic X2600).
