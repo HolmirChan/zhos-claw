@@ -1,8 +1,19 @@
 # Backlog
 
-> 当前迭代: -
+> 当前迭代: sprint_003.md
 
 ## 待规划
+
+### BL-005 · 品牌一键替换 — 定制小龙虾
+- **意图**: 在 `pkg/env.go` 改一处常量 + Makefile 变量，`make build` 产出完全换牌的二进制（env 前缀、二进制名、默认目录、显示名）
+- **方案方向**: `pkg/env.go` 集中管理品牌变量；所有 env 读取统一走 `pkg.GetEnv()` 支持向下兼容；struct tag 通过构建时 sed 替换；Makefile 加 `CUSTOM_PREFIX` 变量
+- **设计文档**: `docs/superpowers/specs/2026-05-27-custom-branding-design.md`
+- **验收标准**:
+  - [ ] `make build` 默认前缀编译通过、全量测试通过
+  - [ ] `CUSTOM_PREFIX=ZHOSCLAW_ make build` 编译通过、全量测试通过
+  - [ ] 自定义前缀的二进制中 `grep PICOCLAW_` 零结果
+  - [ ] 旧前缀 `PICOCLAW_*` env 仍能正常识别（向下兼容）
+  - [ ] Web UI 二进制名由 `pkg.CommandName` 控制
 
 ## 已交付
 
