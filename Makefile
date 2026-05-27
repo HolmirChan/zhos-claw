@@ -70,17 +70,20 @@ define validate-prefix
 endef
 
 # Apply custom prefix to struct tags via sed, build, then restore ONLY the files sed changed.
+# Uses a temp file list to avoid restoring unrelated user changes (e.g. pkg/env.go).
 define build-with-custom-prefix
 	$(call validate-prefix)
 	@if [ "$(CUSTOM_PREFIX)" != "PICOCLAW_" ]; then \
 		echo "  Applying custom prefix to struct tags: $(CUSTOM_PREFIX)"; \
-		find pkg cmd web/backend -name '*.go' ! -name '*_test.go' -exec sed $(SED_INPLACE) \
+		grep -rl --include='*.go' 'envPrefix:"PICOCLAW_\|env:"PICOCLAW_' pkg cmd web/backend > /tmp/sed-files.$$$$; \
+		xargs -a /tmp/sed-files.$$$$ sed $(SED_INPLACE) \
 			-e 's/envPrefix:"PICOCLAW_/envPrefix:"$(CUSTOM_PREFIX)/g' \
-			-e 's/env:"PICOCLAW_/env:"$(CUSTOM_PREFIX)/g' {} + ; \
+			-e 's/env:"PICOCLAW_/env:"$(CUSTOM_PREFIX)/g'; \
 	fi
 	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(1) ./$(CMD_DIR)
 	@if [ "$(CUSTOM_PREFIX)" != "PICOCLAW_" ]; then \
-		git diff --name-only pkg/ cmd/ web/backend/ | xargs -r git checkout -- 2>/dev/null || true; \
+		xargs -a /tmp/sed-files.$$$$ git checkout -- 2>/dev/null || true; \
+		rm -f /tmp/sed-files.$$$$; \
 	fi
 endef
 
