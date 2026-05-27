@@ -259,24 +259,6 @@ export function AppHeader() {
           </Tooltip>
         )}
 
-        <Separator
-          className="mx-4 my-2 hidden md:block"
-          orientation="vertical"
-        />
-
-        {/* Docs Link */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8"
-          data-tour="docs-button"
-          asChild
-        >
-          <a href="https://docs.picoclaw.io" target="_blank" rel="noreferrer">
-            <IconBook className="size-4.5" />
-          </a>
-        </Button>
-
         {/* Language Switcher */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
