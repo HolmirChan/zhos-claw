@@ -436,7 +436,7 @@
         "streamingMinGrowthChars": "Crescimento mínimo de texto antes de enviar outra atualização intermediária. 0 significa usar o padrão. Respostas finais não são limitadas.",
         "groupTriggerMentionOnly": "Em chats em grupo, responder apenas quando o bot for mencionado.",
         "groupTriggerPrefixes": "Prefixos customizados de trigger para chats em grupo. Adicione itens um a um ou cole vários valores de uma vez.",
-        "randomReactionEmoji": "PicoClaw adiciona reações de emoji às mensagens dos usuários para confirmar recebimento. Exemplo: \"THUMBSUP\", \"HEART\", \"SMILE\". Deixe vazio para usar o emoji \"Pin\" padrão.",
+        "randomReactionEmoji": "ZaiAgent adiciona reações de emoji às mensagens dos usuários para confirmar recebimento. Exemplo: \"THUMBSUP\", \"HEART\", \"SMILE\". Deixe vazio para usar o emoji \"Pin\" padrão.",
         "isLark": "Usar o domínio internacional do Lark (open.larksuite.com) em vez do domínio do Feishu (open.feishu.cn).",
         "allowFrom": "IDs de usuário ou grupo permitidos. Adicione itens um a um ou cole vários valores de uma vez.",
         "allowOrigins": "Domínios de origem permitidos. Adicione itens um a um ou cole vários valores de uma vez.",
@@ -702,11 +702,11 @@
       "monitor_usb": "Monitorar USB",
       "monitor_usb_hint": "Observar eventos de plug/unplug USB quando dispositivos estiverem habilitados.",
       "autostart_label": "Iniciar no Login",
-      "autostart_hint": "Iniciar o PicoClaw Web automaticamente quando você fizer login.",
+      "autostart_hint": "Iniciar o ZaiAgent Web automaticamente quando você fizer login.",
       "autostart_unsupported": "Iniciar no login não é suportado nesta plataforma.",
       "autostart_load_error": "Falha ao carregar status de iniciar no login.",
       "server_port": "Porta do Serviço",
-      "server_port_hint": "Porta HTTP usada pelo PicoClaw Web.",
+      "server_port_hint": "Porta HTTP usada pelo ZaiAgent Web.",
       "launcher_section_hint": "Alterações nesta seção entram em vigor após o launcher reiniciar.",
       "gateway_restart_hint": "Alterações nesta seção entram em vigor após o gateway reiniciar.",
       "dashboard_password": "Senha de Login",
@@ -780,8 +780,8 @@
     "next": "Próximo",
     "finish": "Concluir",
     "welcome": {
-      "title": "Bem-vindo ao PicoClaw",
-      "description": "PicoClaw é uma plataforma poderosa de assistente de IA. Vamos levar alguns segundos para te ajudar a concluir a configuração básica."
+      "title": "Bem-vindo ao ZaiAgent",
+      "description": "ZaiAgent é uma plataforma poderosa de assistente de IA. Vamos levar alguns segundos para te ajudar a concluir a configuração básica."
     },
     "models": {
       "title": "Configurar Modelos",
