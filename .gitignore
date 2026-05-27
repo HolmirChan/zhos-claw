@@ -11,6 +11,7 @@ build/
 /picoclaw
 /picoclaw-test
 cmd/**/workspace
+!cmd/picoclaw/internal/onboard/workspace/
 
 # Picoclaw specific
 
@@ -26,7 +27,7 @@ build/
 .env
 config/config.json
 .security.yml
-onboard
+/onboard
 
 # Deploy assets (sensitive, keep directory structure via .gitkeep)
 scripts/deploy-rk3506/*.key
