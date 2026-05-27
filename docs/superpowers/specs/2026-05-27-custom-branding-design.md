@@ -66,10 +66,8 @@ func LookupEnv(suffix string) (string, bool) {
 `pkg/config/config.go` 等文件中的 struct tag `envPrefix:"PICOCLAW_XXX_"` 无法引用 Go 变量。策略：
 
 1. **源码中**：struct tag 保持 `PICOCLAW_` 前缀不动
-2. **构建时**：Makefile 将 `pkg/` 和 `cmd/` 目录拷贝到临时路径，对其中的 `.go` 文件执行 `sed 's/PICOCLAW_/${CUSTOM_PREFIX}/g'`，再编译
+2. **构建时**：Makefile 将源码拷贝到临时路径，对其中的 `.go` 文件执行精确 sed 替换，只替换 `envPrefix:"PICOCLAW_` 模式（不碰其他 `PICOCLAW_` 字符串，如 `pkg/env.go` 中的默认值和 fallback 函数）
 3. **编译后**：临时目录删除，源码不变
-
-`PICOCLAW_` 作为替换目标足够独特（全大写 + 下划线结尾），不会误伤 import 路径或其他标识符。
 
 ### 向下兼容：env 映射 fallback
 

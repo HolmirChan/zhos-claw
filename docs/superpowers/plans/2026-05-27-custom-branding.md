@@ -556,13 +556,25 @@ Co-Authored-By: Claude Code"
 在 Makefile 顶部追加：
 
 ```makefile
-# 品牌自定义前缀（默认 PICOCLAW_）
+# 品牌自定义变量（默认值保持与当前 BINARY_NAME=zhosclaw 一致）
 CUSTOM_PREFIX ?= PICOCLAW_
-CUSTOM_HOME ?= .picoclaw
-CUSTOM_CMD ?= picoclaw
-CUSTOM_APP ?= PicoClaw
-CUSTOM_LOGO ?= 🦞
+CUSTOM_HOME   ?= .picoclaw
+CUSTOM_CMD    ?= picoclaw
+CUSTOM_APP    ?= PicoClaw
+CUSTOM_LOGO   ?= 🦞
 ```
+
+同时在文件顶部（当前 `BINARY_NAME=zhosclaw` 第 4 行）将 `BINARY_NAME` 改为从 `CUSTOM_CMD` 派生：
+
+```makefile
+# 修改前（第 4 行）：
+BINARY_NAME=zhosclaw
+
+# 修改后：
+BINARY_NAME ?= $(CUSTOM_CMD)
+```
+
+这样自定义 `CUSTOM_CMD=zhosclaw make build` 会产出 `build/zhosclaw`，验证脚本的路径检查才能正确匹配。
 
 - [ ] **Step 2: 修改 LDFLAGS 加入品牌变量**
 
@@ -709,15 +721,16 @@ Expected: 零结果（或仅注释中出现）
 ```bash
 #!/bin/bash
 set -e
+BIN="build/zhosclaw"  # BINARY_NAME 默认值
 echo "=== 1. Building with default prefix ==="
 make build
 echo "=== 2. Running tests with default prefix ==="
 make test
 echo "=== 3. Building with custom prefix ==="
 CUSTOM_PREFIX=ZHOSCLAW_ CUSTOM_HOME=.zhosclaw CUSTOM_CMD=zhosclaw make build
-echo "=== 4. Binary residue check ==="
+echo "=== 4. Binary residue check ($BIN) ==="
 # GetEnv 2 处 + envOptions 2 处 = 最多 4 处有意保留的 fallback 字符串
-COUNT=$(strings build/zhosclaw | grep -c 'PICOCLAW_' || true)
+COUNT=$(strings "$BIN" | grep -c 'PICOCLAW_' || true)
 if [ "$COUNT" -le 4 ]; then
     echo "PASS: PICOCLAW_ occurrences: $COUNT"
 else
