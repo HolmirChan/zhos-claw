@@ -31,13 +31,13 @@ ${HDC} shell "mkdir -p ${REMOTE_DIR} ${PICOCLAW_HOME_DIR} ${LOG_DIR}"
 
 echo "==> Uploading files..."
 ${HDC} file send "${ASSETS_DIR}/cert.pem"              "${REMOTE_DIR}/cert.pem"
-${HDC} file send "${ASSETS_DIR}/zhosclaw_ed25519.key"  "${PICOCLAW_HOME_DIR}/zhosclaw_ed25519.key"
+${HDC} file send "${ASSETS_DIR}/zhosclaw_ed25519.key"  "${PICOCLAW_HOME_DIR}/${CMD}_ed25519.key"
 ${HDC} file send "build/${CMD}-linux-arm"              "${REMOTE_DIR}/${CMD}-linux-arm"
 ${HDC} file send "build/${CMD}-web-linux-arm"          "${REMOTE_DIR}/${CMD}-web-linux-arm"
 
 echo "==> Setting permissions and symlink..."
 ${HDC} shell "chmod +x ${REMOTE_DIR}/${CMD}-linux-arm ${REMOTE_DIR}/${CMD}-web-linux-arm"
-${HDC} shell "chmod 600 ${PICOCLAW_HOME_DIR}/zhosclaw_ed25519.key"
+${HDC} shell "chmod 600 ${PICOCLAW_HOME_DIR}/${CMD}_ed25519.key"
 ${HDC} shell "ln -sf ${REMOTE_DIR}/${CMD}-linux-arm ${REMOTE_DIR}/${CMD}"
 
 echo "==> Initializing home directory (first deploy only)..."
@@ -58,7 +58,7 @@ INIT_NAME="S81${CMD}"
 cat > "/tmp/${INIT_NAME}" << EOF
 #!/bin/sh
 export ${PREFIX}HOME=${PICOCLAW_HOME_DIR}
-export ${PREFIX}SSH_KEY_PATH=${PICOCLAW_HOME_DIR}/zhosclaw_ed25519.key
+export ${PREFIX}SSH_KEY_PATH=${PICOCLAW_HOME_DIR}/${CMD}_ed25519.key
 export ${PREFIX}KEY_PASSPHRASE=${PASSPHRASE}
 export SSL_CERT_FILE=${REMOTE_DIR}/cert.pem
 GODEBUG=asyncpreemptoff=1 nohup ${REMOTE_DIR}/${CMD}-web-linux-arm -public >> ${LOG_DIR}/launcher.log 2>&1 &
