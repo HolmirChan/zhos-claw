@@ -28,6 +28,10 @@ config/config.json
 .security.yml
 onboard
 
+# Deploy assets (sensitive, keep directory structure via .gitkeep)
+scripts/deploy-rk3506/*.key
+scripts/deploy-rk3506/passphrase.txt
+
 
 # Test
 coverage.txt

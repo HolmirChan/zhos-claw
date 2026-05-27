@@ -3,7 +3,7 @@
 > 创建: 2026-05-25
 > 目标版本: -
 > 来源: BACKLOG.md（BL-004）
-> 状态: 进行中
+> 状态: 已完成
 
 ## 任务清单
 
@@ -68,7 +68,7 @@
   - [x] 创建软链接 `ln -s /data/zhosclaw/zhosclaw-linux-arm /data/zhosclaw/zhosclaw`（供 launcher 自动拉起 gateway）
   - [x] 启动服务：`PICOCLAW_HOME=/data/zhosclaw /data/zhosclaw/zhosclaw-web-linux-arm -public`
   - [x] 局域网浏览器打开 `http://192.168.18.250:18800`，确认聊天界面加载
-  - [ ] 发送「执行 ls /tmp」，确认 Agent 返回目录列表（待 API Key 配置完成后验证）
+  - [x] 发送「执行 ls /tmp」，确认 Agent 返回目录列表（Agent 绕过安全限制成功执行并返回 /tmp 内容）
 - **阻塞**: 需要 RK3506 实机
 - **备注**:
   - 设备无 `$HOME`，`GetHome()` 兜底为 `.`，两个进程若从不同目录启动会找不到对方的 PID 文件
