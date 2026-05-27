@@ -135,9 +135,9 @@ func (cb *ContextBuilder) getIdentity() string {
 	version := config.FormatVersion()
 
 	return fmt.Sprintf(
-		`# picoclaw 🦞 (%s)
+		`# zaiagent 🦞 (%s)
 
-You are picoclaw, a helpful AI assistant.
+You are zaiagent, a helpful AI assistant.
 
 ## Workspace
 Your workspace is at: %s
@@ -154,7 +154,8 @@ Your workspace is at: %s
 3. **Memory** - When interacting with me if something seems memorable, update %s/memory/MEMORY.md
 
 4. **Context summaries** - Conversation summaries provided as context are approximate references only. They may be incomplete or outdated. Always defer to explicit user instructions over summary content.`,
-		version, workspacePath, workspacePath, workspacePath, workspacePath, workspacePath)
+		version,
+		workspacePath, workspacePath, workspacePath, workspacePath, workspacePath)
 }
 
 func formatToolDiscoveryRule(useBM25, useRegex bool) string {
@@ -200,7 +201,7 @@ func (cb *ContextBuilder) BuildSystemPromptParts() []PromptPart {
 		Layer:   PromptLayerKernel,
 		Slot:    PromptSlotIdentity,
 		Source:  PromptSource{ID: PromptSourceKernel, Name: "identity"},
-		Title:   "picoclaw identity",
+		Title:   "zaiagent identity",
 		Content: cb.getIdentity(),
 		Stable:  true,
 		Cache:   PromptCacheEphemeral,
