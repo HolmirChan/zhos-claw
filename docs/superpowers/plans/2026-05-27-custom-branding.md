@@ -603,7 +603,7 @@ LDFLAGS=-X $(CONFIG_PKG).Version=$(VERSION) -X $(CONFIG_PKG).GitCommit=$(GIT_COM
 3. **并发安全**：临时目录加 PID 后缀避免并行 `make -j` 冲突
 
 ```makefile
-CUSTOM_PREFIX ?= PICOCLAW_
+CUSTOM_PREFIX ?= ZHOSCLAW_
 
 # 跨平台 sed in-place 选项
 SED_INPLACE := $(if $(shell sed --version 2>/dev/null | head -1 | grep -qi gnu && echo 1),-i,-i '')
