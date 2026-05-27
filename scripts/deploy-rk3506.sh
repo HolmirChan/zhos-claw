@@ -23,7 +23,7 @@ echo "==> Building for RK3506..."
 make build-rk3506
 
 echo "==> Connecting to device ${DEVICE_IP}:${DEVICE_PORT}..."
-hdc conn "${DEVICE_IP}:${DEVICE_PORT}"
+hdc tconn "${DEVICE_IP}:${DEVICE_PORT}"
 
 echo "==> Stopping existing processes..."
 ${HDC} shell "pkill -f ${CMD}-web || true; pkill -f ${CMD} || true"
@@ -31,7 +31,7 @@ ${HDC} shell "mkdir -p ${REMOTE_DIR} ${PICOCLAW_HOME_DIR} ${LOG_DIR}"
 
 echo "==> Uploading files..."
 ${HDC} file send "${ASSETS_DIR}/cert.pem"              "${REMOTE_DIR}/cert.pem"
-${HDC} file send "${ASSETS_DIR}/zhosclaw_ed25519.key"  "${PICOCLAW_HOME_DIR}/${CMD}_ed25519.key"
+${HDC} file send "${ASSETS_DIR}/zaiagent_ed25519.key"  "${PICOCLAW_HOME_DIR}/${CMD}_ed25519.key"
 ${HDC} file send "build/${CMD}-linux-arm"              "${REMOTE_DIR}/${CMD}-linux-arm"
 ${HDC} file send "build/${CMD}-web-linux-arm"          "${REMOTE_DIR}/${CMD}-web-linux-arm"
 
