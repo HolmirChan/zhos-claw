@@ -556,11 +556,13 @@ Co-Authored-By: Claude Code"
 在 Makefile 顶部追加：
 
 ```makefile
-# 品牌自定义变量（默认值保持与当前 BINARY_NAME=zhosclaw 一致）
-CUSTOM_PREFIX ?= PICOCLAW_
-CUSTOM_HOME   ?= .picoclaw
-CUSTOM_CMD    ?= picoclaw
-CUSTOM_APP    ?= PicoClaw
+# 品牌自定义变量。默认值对应本项目当前品牌（ZhosClaw）。
+# pkg/env.go 中保持上游默认值（PICOCLAW_/.picoclaw/picoclaw/PicoClaw），
+# Makefile 在此覆盖，make build 直接产出 zhocl claw 二进制。
+CUSTOM_PREFIX ?= ZHOSCLAW_
+CUSTOM_HOME   ?= .zhosclaw
+CUSTOM_CMD    ?= zhosclaw
+CUSTOM_APP    ?= ZhosClaw
 CUSTOM_LOGO   ?= 🦞
 ```
 

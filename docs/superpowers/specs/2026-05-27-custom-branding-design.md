@@ -97,10 +97,11 @@ func envOptions() env.Options {
 新增品牌变量 + 跨平台 sed + 校验 + 精确 struct tag 替换宏：
 
 ```makefile
-CUSTOM_PREFIX ?= PICOCLAW_
-CUSTOM_HOME   ?= .picoclaw
-CUSTOM_CMD    ?= picoclaw
-CUSTOM_APP    ?= PicoClaw
+# 默认值对应本项目品牌（ZhosClaw），pkg/env.go 保持上游默认（PICOCLAW_/...）
+CUSTOM_PREFIX ?= ZHOSCLAW_
+CUSTOM_HOME   ?= .zhosclaw
+CUSTOM_CMD    ?= zhosclaw
+CUSTOM_APP    ?= ZhosClaw
 CUSTOM_LOGO   ?= 🦞
 
 # 跨平台 sed in-place 选项
