@@ -1410,7 +1410,7 @@ func LoadConfig(path string) (*Config, error) {
 
 	gatewayHostBeforeEnv := cfg.Gateway.Host
 
-	if err = env.Parse(cfg); err != nil {
+	if err = env.ParseWithOptions(cfg, envOptions()); err != nil {
 		return nil, err
 	}
 	applySkillsRegistryEnvCompat(cfg)

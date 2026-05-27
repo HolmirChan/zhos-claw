@@ -8,7 +8,9 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/caarlos0/env/v11"
 	"github.com/sipeed/picoclaw/pkg"
 )
 
@@ -35,4 +37,27 @@ func GetHome() string {
 		homePath = "."
 	}
 	return homePath
+}
+
+// envOptions returns env.Options that maps both the configured prefix
+// and the legacy PICOCLAW_ prefix into the environment, so struct tags
+// work regardless of which env vars the user has set.
+func envOptions() env.Options {
+	raw := os.Environ()
+	envMap := make(map[string]string, len(raw))
+	for _, e := range raw {
+		k, v, _ := strings.Cut(e, "=")
+		envMap[k] = v
+	}
+	// Fallback: PICOCLAW_* → configured prefix_*
+	for _, e := range raw {
+		k, v, _ := strings.Cut(e, "=")
+		if strings.HasPrefix(k, "PICOCLAW_") {
+			newKey := pkg.EnvPrefix + strings.TrimPrefix(k, "PICOCLAW_")
+			if _, ok := envMap[newKey]; !ok {
+				envMap[newKey] = v
+			}
+		}
+	}
+	return env.Options{Environment: envMap}
 }
