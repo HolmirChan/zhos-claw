@@ -11,19 +11,19 @@ var (
 
 	// AppName is the user-visible application display name.
 	// Overridable at compile time via -ldflags.
-	AppName = "PicoClaw"
+	AppName = "ZaiAgent"
 
 	// EnvPrefix is the prefix for all environment variables.
 	// Overridable at compile time via -ldflags.
-	EnvPrefix = "PICOCLAW_"
+	EnvPrefix = "ZAIAGENT_"
 
 	// DefaultHome is the default config directory name (relative to user home).
 	// Overridable at compile time via -ldflags.
-	DefaultHome = ".picoclaw"
+	DefaultHome = ".zaiagent"
 
 	// CommandName is the CLI command name (lowercase).
 	// Overridable at compile time via -ldflags.
-	CommandName = "picoclaw"
+	CommandName = "zaiagent"
 )
 
 const (
@@ -31,12 +31,12 @@ const (
 )
 
 // GetEnv reads an environment variable with the configured prefix,
-// falling back to the PICOCLAW_ prefix for backward compatibility.
+// falling back to the ZAIAGENT_ prefix for backward compatibility.
 func GetEnv(suffix string) string {
 	if v := os.Getenv(EnvPrefix + suffix); v != "" {
 		return v
 	}
-	return os.Getenv("PICOCLAW_" + suffix)
+	return os.Getenv("ZAIAGENT_" + suffix)
 }
 
 // LookupEnv is like GetEnv but reports whether the key was present.
@@ -45,5 +45,5 @@ func LookupEnv(suffix string) (string, bool) {
 	if v, ok := os.LookupEnv(EnvPrefix + suffix); ok {
 		return v, true
 	}
-	return os.LookupEnv("PICOCLAW_" + suffix)
+	return os.LookupEnv("ZAIAGENT_" + suffix)
 }
