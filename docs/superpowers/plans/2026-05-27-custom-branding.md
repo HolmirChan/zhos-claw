@@ -24,12 +24,15 @@ package pkg
 
 import "os"
 
-const (
-	Logo    = "🦞"
-	AppName = "PicoClaw"
-)
-
 var (
+	// Logo is the emoji icon displayed in the terminal.
+	// Overridable at compile time via -ldflags.
+	Logo = "🦞"
+
+	// AppName is the user-visible application display name.
+	// Overridable at compile time via -ldflags.
+	AppName = "PicoClaw"
+
 	// EnvPrefix is the prefix for all environment variables.
 	// Overridable at compile time via -ldflags.
 	EnvPrefix = "PICOCLAW_"
@@ -57,8 +60,9 @@ func GetEnv(suffix string) string {
 }
 
 // LookupEnv is like GetEnv but reports whether the key was present.
+// Matches os.LookupEnv semantics: an empty-but-set variable returns ("", true).
 func LookupEnv(suffix string) (string, bool) {
-	if v, ok := os.LookupEnv(EnvPrefix + suffix); ok && v != "" {
+	if v, ok := os.LookupEnv(EnvPrefix + suffix); ok {
 		return v, true
 	}
 	return os.LookupEnv("PICOCLAW_" + suffix)
@@ -473,13 +477,13 @@ pidData *ppid.PidFileData // pid file data read from picoclaw.pid.json
 ```go
 // 第 18 行:
 launchAgentLabel = "io.picoclaw.launcher"
-// 改为:
-launchAgentLabel = "io." + pkg.CommandName + ".launcher"
+// 保持不动！LaunchAgent label 是 macOS 系统级持久标识，换牌后若变化会导致新旧两个 plist 同时存在、
+// 重复启动。它应被视为内部标识符，不参与品牌替换。
+// 如需支持多品牌共存，后续迭代单独设计命名空间方案。
 
 // 第 221 行:
 return filepath.Join(home, ".config", "autostart", "picoclaw-web.desktop")
-// 改为:
-return filepath.Join(home, ".config", "autostart", pkg.CommandName + "-web.desktop")
+// 同上，保持不动。autostart 文件名是系统级标识，不应随品牌变化。
 ```
 
 - [ ] **Step 6: web/backend/api/update.go**
@@ -522,8 +526,8 @@ tmpDir, tempDirErr := os.MkdirTemp("", pkg.CommandName+"-skill-import-*")
 ```go
 // 第 17 行:
 const LauncherDashboardCookieName = "picoclaw_launcher_auth"
-// 改为:
-var LauncherDashboardCookieName = pkg.CommandName + "_launcher_auth"
+// 保持不动！Cookie 名是浏览器持久标识，换牌后会导致所有已登录用户被踢出。
+// 应被视为内部标识符，不参与品牌替换。
 ```
 
 - [ ] **Step 11: web/backend/i18n.go**
@@ -587,21 +591,39 @@ LDFLAGS=-X $(CONFIG_PKG).Version=$(VERSION) -X $(CONFIG_PKG).GitCommit=$(GIT_COM
 - fallback 函数中的 `"PICOCLAW_"` 必须保留以支持向下兼容
 - 其他 Go 代码已通过 Task 3-6 改用 `pkg.GetEnv()` 等引用变量
 
-因此 sed 命令精确匹配 `envPrefix:"PICOCLAW_` 模式：
+因此 sed 命令精确匹配 `envPrefix:"PICOCLAW_` 模式。
+
+同时处理三个跨平台问题：
+1. **BSD vs GNU sed**：macOS 用 `sed -i ''`，Linux 用 `sed -i`，自动检测
+2. **CUSTOM_PREFIX 校验**：含 `/` 或 `&` 会破坏 sed，提前拦截
+3. **并发安全**：临时目录加 PID 后缀避免并行 `make -j` 冲突
 
 ```makefile
 CUSTOM_PREFIX ?= PICOCLAW_
 
+# 跨平台 sed in-place 选项
+SED_INPLACE := $(if $(shell sed --version 2>/dev/null | head -1 | grep -qi gnu && echo 1),-i,-i '')
+
+# 校验 CUSTOM_PREFIX 不含 sed 特殊字符
+define validate-prefix
+	@case "$(CUSTOM_PREFIX)" in \
+		*/*) echo "ERROR: CUSTOM_PREFIX must not contain '/': $(CUSTOM_PREFIX)" >&2; exit 1 ;; \
+		*\\&*) echo "ERROR: CUSTOM_PREFIX must not contain '&': $(CUSTOM_PREFIX)" >&2; exit 1 ;; \
+		*) ;; \
+	esac
+endef
+
 # 内部宏：在临时目录中替换 struct tag 前缀并编译
 define build-with-custom-prefix
-	@mkdir -p $(BUILD_DIR)/custom-build
-	@cp -r cmd pkg web go.mod go.sum $(BUILD_DIR)/custom-build/
+	$(call validate-prefix)
+	@mkdir -p $(BUILD_DIR)/custom-build.$$$$
+	@cp -r cmd pkg web go.mod go.sum $(BUILD_DIR)/custom-build.$$$$/
 	@if [ "$(CUSTOM_PREFIX)" != "PICOCLAW_" ]; then \
 		echo "  Applying custom prefix to struct tags: $(CUSTOM_PREFIX)"; \
-		find $(BUILD_DIR)/custom-build -name '*.go' -exec sed -i '' 's/envPrefix:"PICOCLAW_/envPrefix:"$(CUSTOM_PREFIX)/g' {} + ; \
+		find $(BUILD_DIR)/custom-build.$$$$ -name '*.go' -exec sed $(SED_INPLACE) 's/envPrefix:"PICOCLAW_/envPrefix:"$(CUSTOM_PREFIX)/g' {} + ; \
 	fi
-	cd $(BUILD_DIR)/custom-build && $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(1) ./cmd/picoclaw
-	@rm -rf $(BUILD_DIR)/custom-build
+	cd $(BUILD_DIR)/custom-build.$$$$ && $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(1) ./cmd/picoclaw
+	@rm -rf $(BUILD_DIR)/custom-build.$$$$
 endef
 
 ## build: Build the binary for current platform
@@ -696,7 +718,15 @@ make test
 echo "=== 3. Building with custom prefix ==="
 CUSTOM_PREFIX=ZHOSCLAW_ CUSTOM_HOME=.zhosclaw CUSTOM_CMD=zhosclaw make build
 echo "=== 4. Binary residue check ==="
-strings build/zhosclaw | grep 'PICOCLAW_' && echo "FAIL: PICOCLAW_ found in binary" && exit 1 || echo "PASS"
+# 统计 PICOCLAW_ 出现次数。GetEnv/LookupEnv 中有意保留的 fallback 字符串会导致 2 次出现（默认构建）
+# 或 0 次（自定义构建时 struct tag 被替换）。允许 ≤2 次，超过则报 FAIL。
+COUNT=$(strings build/zhosclaw | grep -c 'PICOCLAW_' || true)
+if [ "$COUNT" -le 2 ]; then
+    echo "PASS: PICOCLAW_ occurrences in binary: $COUNT (<= 2 allowed for fallback)"
+else
+    echo "FAIL: PICOCLAW_ found $COUNT times in binary (max 2 allowed)"
+    exit 1
+fi
 echo "=== All checks passed ==="
 ```
 

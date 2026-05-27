@@ -18,41 +18,48 @@
 
 ```go
 var (
-    // EnvPrefix 是所有环境变量的前缀，可在其余包中通过 GetEnv() 使用。
-    // 构建时可通过 ldflags 覆盖：-ldflags "-X github.com/sipeed/picoclaw/pkg.EnvPrefix=ZHOSCLAW_"
-    EnvPrefix = "PICOCLAW_"
+    // Logo 是终端展示的 emoji 图标。ldflags 可覆盖。
+    Logo = "🦞"
 
-    // DefaultHome 是默认配置目录名（相对于用户 home）。
-    // 构建时可通过 ldflags 覆盖。
-    DefaultHome = ".picoclaw"
-
-    // CommandName 是 CLI 子命令名称（小写），也影响二进制文件名。
-    CommandName = "picoclaw"
-
-    // AppName 是用户可见的应用显示名称。
+    // AppName 是用户可见的应用显示名称。ldflags 可覆盖。
     AppName = "PicoClaw"
 
-    // Logo 是终端展示的 emoji 图标。
-    Logo = "🦞"
+    // EnvPrefix 是所有环境变量的前缀。ldflags 可覆盖。
+    EnvPrefix = "PICOCLAW_"
+
+    // DefaultHome 是默认配置目录名（相对于用户 home）。ldflags 可覆盖。
+    DefaultHome = ".picoclaw"
+
+    // CommandName 是 CLI 子命令名称（小写），也影响二进制文件名。ldflags 可覆盖。
+    CommandName = "picoclaw"
 )
 ```
 
-## Env 变量统一入口：`pkg.GetEnv()`
+> **注意**：全部用 `var` 而非 `const`，因为 `-ldflags "-X"` 只能覆盖 `var`。
 
-新增 `pkg/env.go` 中的辅助函数，所有 `os.Getenv("PICOCLAW_XXX")` 改为调用它：
+## Env 变量统一入口：`pkg.GetEnv()` / `pkg.LookupEnv()`
 
 ```go
+// GetEnv 读取带配置前缀的环境变量，新前缀优先，旧前缀兜底。
 func GetEnv(suffix string) string {
     if v := os.Getenv(EnvPrefix + suffix); v != "" {
         return v
     }
-    return os.Getenv("PICOCLAW_" + suffix) // 向下兼容旧前缀
+    return os.Getenv("PICOCLAW_" + suffix)
+}
+
+// LookupEnv 同 GetEnv 但报告 key 是否存在。空值语义与 os.LookupEnv 一致。
+func LookupEnv(suffix string) (string, bool) {
+    if v, ok := os.LookupEnv(EnvPrefix + suffix); ok {
+        return v, true
+    }
+    return os.LookupEnv("PICOCLAW_" + suffix)
 }
 ```
 
-同时提供 `LookupEnv(suffix string) (string, bool)` 以覆盖所有使用场景。
-
 存量代码中 `os.Getenv` / `os.LookupEnv` 全部替换为这两个函数调用。
+
+> **不参与品牌替换的内部标识符**：Cookie 名（`picoclaw_launcher_auth`）、macOS LaunchAgent label（`io.picoclaw.launcher`）、autostart desktop 文件名等持久化系统标识，换牌后保持不变。否则会导致已登录用户被踢出、LaunchAgent 重复注册等破坏性问题。
 
 ## struct tag 的 `envPrefix`：构建时替换 + 运行时兼容
 
