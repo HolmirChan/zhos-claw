@@ -1,6 +1,7 @@
 # 品牌一键替换 实现计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> 状态: 已完成 (2026-05-27)
+> 完成于: sprint_003.md
 
 **Goal:** `pkg/env.go` 改一处值 + Makefile 变量，`make build` 产出完全换牌二进制（env 前缀、二进制名、默认目录、显示名全部替换）
 
