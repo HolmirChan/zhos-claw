@@ -14,8 +14,7 @@ import (
 	"github.com/sipeed/picoclaw/pkg/logger"
 )
 
-// GetPicoclawHome returns the picoclaw home directory.
-// Priority: $PICOCLAW_HOME > ~/.picoclaw
+// GetPicoclawHome returns the home directory.
 func GetPicoclawHome() string {
 	return config.GetHome()
 }
@@ -28,9 +27,9 @@ func GetDefaultConfigPath() string {
 	return filepath.Join(GetPicoclawHome(), "config.json")
 }
 
-// FindPicoclawBinary locates the picoclaw executable.
+// FindPicoclawBinary locates the gateway executable.
 // Search order:
-//  1. PICOCLAW_BINARY environment variable (explicit override)
+//  1. EnvBinary environment variable (explicit override)
 //  2. Same directory as the current executable
 //  3. Falls back to pkg.CommandName and relies on $PATH
 func FindPicoclawBinary() string {
@@ -46,14 +45,14 @@ func FindPicoclawBinary() string {
 	}
 
 	if exe, err := os.Executable(); err == nil {
-		logger.Debugf("Trying to find picoclaw binary in %s", exe)
+		logger.Debugf("Trying to find %s binary in %s", pkg.CommandName, exe)
 		candidate := filepath.Join(filepath.Dir(exe), binaryName)
 		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
 			return candidate
 		}
 	}
 
-	return "picoclaw"
+	return pkg.CommandName
 }
 
 func appendUniqueIP(addrs []string, seen map[string]struct{}, value string) []string {

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sipeed/picoclaw/pkg"
 	"github.com/sipeed/picoclaw/pkg/config"
 	"github.com/sipeed/picoclaw/web/backend/utils"
 )
@@ -50,13 +51,17 @@ var (
 	runPicoclawVersionOutput    = executePicoclawVersion
 	currentGatewayVersionState  = gatewayVersionState
 	launcherBuildInfoForVersion = fallbackSystemVersionInfoFromConfig
-	versionInfoCache            = newSystemVersionCache()
-	ansiEscapePattern           = regexp.MustCompile(`\x1b\[[0-9;]*m`)
-	versionLinePattern          = regexp.MustCompile(
-		`^(?:[^A-Za-z0-9]*\s*)?picoclaw(?:\.exe)?\s+([^\s(]+)` +
+	versionInfoCache  = newSystemVersionCache()
+	ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	versionLinePattern *regexp.Regexp
+)
+
+func init() {
+	versionLinePattern = regexp.MustCompile(
+		`^(?:[^A-Za-z0-9]*\s*)?` + regexp.QuoteMeta(pkg.CommandName) + `(?:\.exe)?\s+([^\s(]+)` +
 			`(?:\s+\(git:\s*([^)]+)\))?\s*$`,
 	)
-)
+}
 
 func (h *Handler) registerVersionRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/system/version", h.handleGetVersion)

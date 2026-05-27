@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sipeed/picoclaw/pkg"
 	"github.com/sipeed/picoclaw/pkg/config"
 	"github.com/sipeed/picoclaw/pkg/health"
 	"github.com/sipeed/picoclaw/pkg/logger"
@@ -39,7 +40,7 @@ var gateway = struct {
 	runtimeStatus       string
 	startupDeadline     time.Time
 	logs                *LogBuffer
-	pidData             *ppid.PidFileData // pid file data read from picoclaw.pid.json
+	pidData             *ppid.PidFileData // pid file data read from gateway pid file
 	picoToken           string            // cached raw pico token for upstream gateway proxy injection
 }{
 	runtimeStatus: "stopped",
@@ -1086,7 +1087,7 @@ func (h *Handler) startGatewayLocked(initialStatus string, existingPid int) (int
 	gateway.bootConfigSignature = computeConfigSignature(cfg)
 	setGatewayRuntimeStatusLocked(initialStatus)
 	pid = cmd.Process.Pid
-	logger.InfoC("gateway", fmt.Sprintf("Started picoclaw gateway (PID: %d) from %s", pid, execPath))
+	logger.InfoC("gateway", fmt.Sprintf("Started %s gateway (PID: %d) from %s", pkg.CommandName, pid, execPath))
 
 	// Capture stdout/stderr in background
 	go scanPipe(stdoutPipe, gateway.logs)

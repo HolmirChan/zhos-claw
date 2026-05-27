@@ -14,16 +14,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sipeed/picoclaw/pkg"
 	"github.com/sipeed/picoclaw/pkg/config"
 	"github.com/sipeed/picoclaw/pkg/logger"
 )
 
 const (
-	wecomFlowTTL             = 5 * time.Minute
-	wecomFlowGCAge           = 30 * time.Minute
-	wecomQRSourceID          = "picoclaw"
-	wecomQRGenerateEndpoint  = "https://work.weixin.qq.com/ai/qc/generate"
-	wecomQRQueryEndpoint     = "https://work.weixin.qq.com/ai/qc/query_result"
+	wecomFlowTTL            = 5 * time.Minute
+	wecomFlowGCAge          = 30 * time.Minute
+	wecomQRGenerateEndpoint = "https://work.weixin.qq.com/ai/qc/generate"
+	wecomQRQueryEndpoint    = "https://work.weixin.qq.com/ai/qc/query_result"
+)
+
+var (
+	wecomQRSourceID = pkg.CommandName
 	wecomQRHTTPTimeout       = 15 * time.Second
 	wecomDefaultWebSocketURL = "wss://openws.work.weixin.qq.com"
 	wecomPollStartTimeout    = 15 * time.Second

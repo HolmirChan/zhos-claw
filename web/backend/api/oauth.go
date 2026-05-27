@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sipeed/picoclaw/pkg"
 	"github.com/sipeed/picoclaw/pkg/auth"
 	"github.com/sipeed/picoclaw/pkg/config"
 	"github.com/sipeed/picoclaw/pkg/logger"
@@ -492,7 +493,7 @@ func (h *Handler) handleOAuthLogout(w http.ResponseWriter, r *http.Request) {
 
 func renderOAuthCallbackPage(w http.ResponseWriter, flowID, status, title, errMsg string) {
 	payload := map[string]string{
-		"type":   "picoclaw-oauth-result",
+		"type":   pkg.CommandName + "-oauth-result",
 		"flowId": flowID,
 		"status": status,
 	}

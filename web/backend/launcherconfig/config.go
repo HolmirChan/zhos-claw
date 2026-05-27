@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/sipeed/picoclaw/pkg"
 )
 
 const (
@@ -14,8 +16,11 @@ const (
 	FileName = "launcher-config.json"
 	// DefaultPort is the default port for the web launcher.
 	DefaultPort = 18800
+)
+
+var (
 	// EnvLauncherHost overrides launcher listen host.
-	EnvLauncherHost = "PICOCLAW_LAUNCHER_HOST"
+	EnvLauncherHost = pkg.EnvPrefix + "LAUNCHER_HOST"
 )
 
 // Config stores launch parameters for the web backend service.
