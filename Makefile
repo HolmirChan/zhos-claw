@@ -75,15 +75,16 @@ define build-with-custom-prefix
 	$(call validate-prefix)
 	@if [ "$(CUSTOM_PREFIX)" != "PICOCLAW_" ]; then \
 		echo "  Applying custom prefix to struct tags: $(CUSTOM_PREFIX)"; \
-		grep -rl --include='*.go' 'envPrefix:"PICOCLAW_\|env:"PICOCLAW_' pkg cmd web/backend > /tmp/sed-files.$$$$; \
-		xargs -a /tmp/sed-files.$$$$ sed $(SED_INPLACE) \
+		find pkg cmd web/backend -name '*.go' ! -name '*_test.go' \
+			-exec grep -El 'envPrefix:"PICOCLAW_|env:"PICOCLAW_' {} + > /tmp/zhosclaw-sed-files; \
+		< /tmp/zhosclaw-sed-files xargs sed $(SED_INPLACE) \
 			-e 's/envPrefix:"PICOCLAW_/envPrefix:"$(CUSTOM_PREFIX)/g' \
 			-e 's/env:"PICOCLAW_/env:"$(CUSTOM_PREFIX)/g'; \
 	fi
 	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(1) ./$(CMD_DIR)
 	@if [ "$(CUSTOM_PREFIX)" != "PICOCLAW_" ]; then \
-		xargs -a /tmp/sed-files.$$$$ git checkout -- 2>/dev/null || true; \
-		rm -f /tmp/sed-files.$$$$; \
+		< /tmp/zhosclaw-sed-files xargs git checkout -- 2>/dev/null || true; \
+		rm -f /tmp/zhosclaw-sed-files; \
 	fi
 endef
 
