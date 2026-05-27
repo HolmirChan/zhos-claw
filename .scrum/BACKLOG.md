@@ -1,8 +1,19 @@
 # Backlog
 
-> 当前迭代: -
+> 当前迭代: sprint_004.md
 
 ## 待规划
+
+### BL-006 · Web 前端品牌定制
+- **意图**: Web UI 中所有用户可见的品牌文字（标题、文案、组件、i18n）替换为当前品牌值（ZaiAgent），logo 图片替换，外部文档链接移除
+- **方案方向**: index.html 标题、i18n 文案、组件内硬编码文字、路径占位符全部修改；logo_with_text.png 替换；docs.picoclaw.io 链接删除；localStorage key 和 data 属性保持不动
+- **验收标准**:
+  - [ ] 页面标题为 ZaiAgent
+  - [ ] UI 中不再出现 "PicoClaw" 文字
+  - [ ] 外部文档链接已移除
+  - [ ] `~/.picoclaw` 路径占位符替换为 `~/.zaiagent`
+  - [ ] MQTT 默认 topic 前缀替换为 `/zaiagent`
+  - [ ] localStorage key 和 data 属性未被改动
 
 ## 已交付
 
