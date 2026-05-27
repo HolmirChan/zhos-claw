@@ -779,7 +779,7 @@ func (h *Handler) sessionRuntimeSettings() (string, int, error) {
 func resolveSessionsDir(workspace string) string {
 	if workspace == "" {
 		home, _ := os.UserHomeDir()
-		workspace = filepath.Join(home, pkg.DefaultPicoClawHome, "workspace")
+		workspace = filepath.Join(home, pkg.DefaultHome, "workspace")
 	}
 
 	// Expand ~ prefix

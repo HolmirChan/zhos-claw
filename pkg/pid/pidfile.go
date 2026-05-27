@@ -16,7 +16,7 @@ import (
 	"github.com/sipeed/picoclaw/pkg/logger"
 )
 
-var pidFileName = pkg.DefaultPicoClawHome + ".pid"
+var pidFileName = pkg.DefaultHome + ".pid"
 
 var errInvalidPidFile = errors.New("invalid pid file")
 
