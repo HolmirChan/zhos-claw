@@ -43,7 +43,7 @@ export function MqttForm({
   fieldErrors = {},
 }: MqttFormProps) {
   const { t } = useTranslation()
-  const prefix = asString(config.topic_prefix) || "/picoclaw"
+  const prefix = asString(config.topic_prefix) || "/zaiagent"
   const agentID = asString(config.agent_id) || "{agent_id}"
   const topicBase = `${prefix}/${agentID}/{client_id}`
 
@@ -84,7 +84,7 @@ export function MqttForm({
             <Input
               value={asString(config.topic_prefix)}
               onChange={(e) => onChange("topic_prefix", e.target.value)}
-              placeholder="/picoclaw"
+              placeholder="/zaiagent"
             />
           </Field>
         </CardContent>
