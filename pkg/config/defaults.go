@@ -28,7 +28,8 @@ func DefaultConfig() *Config {
 				Workspace:                 workspacePath,
 				RestrictToWorkspace:       true,
 				Provider:                  "",
-				MaxTokens:                 32768,
+				ModelName:                 "deepseek-v4-flash",
+				MaxTokens:                 128000,
 				Temperature:               nil, // nil means use provider default
 				MaxToolIterations:         50,
 				SummarizeMessageThreshold: 20,
@@ -68,7 +69,15 @@ func DefaultConfig() *Config {
 			// Add your API key to the model you want to use
 			// ============================================
 
-			// Zhipu AI (智谱) - https://open.bigmodel.cn/usercenter/apikeys
+			// DeepSeek V4 Flash (default)
+				{
+					ModelName: "deepseek-v4-flash",
+					Provider:  "deepseek",
+					Model:     "deepseek/deepseek-v4-flash",
+					APIBase:   "https://api.deepseek.com/v1",
+				},
+
+				// Zhipu AI (智谱) - https://open.bigmodel.cn/usercenter/apikeys
 			{
 				ModelName: "glm-4.7",
 				Provider:  "zhipu",
@@ -572,7 +581,7 @@ func defaultChannels() ChannelsConfig {
 			"settings": map[string]any{
 				"server":   "",
 				"tls":      true,
-				"nick":     "picoclaw",
+				"nick":     "zaiagent",
 				"channels": []string{},
 			},
 		},
