@@ -1,5 +1,4 @@
 import {
-  IconBook,
   IconLanguage,
   IconLoader2,
   IconLogout,

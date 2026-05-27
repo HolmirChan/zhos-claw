@@ -273,22 +273,8 @@ function isMissingRequiredValue(value: unknown): boolean {
   return false
 }
 
-function getChannelDocSlug(channelName: string): string {
-  return channelName.replaceAll("_", "-")
-}
-
-const CHANNELS_WITHOUT_DOCS = new Set([
-  "pico",
-  "wecom",
-  "matrix",
-  "irc",
-  "whatsapp",
-  "whatsapp_native",
-  "mqtt",
-])
-
 export function ChannelConfigPage({ channelName }: ChannelConfigPageProps) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const { state: gatewayState } = useGateway()
 
   const [loading, setLoading] = useState(true)
