@@ -69,22 +69,24 @@ define validate-prefix
 	esac
 endef
 
-# Apply custom prefix to struct tags via sed, build, then restore ONLY the files sed changed.
-# Uses a temp file list to avoid restoring unrelated user changes (e.g. pkg/env.go).
+# Apply custom prefix to struct tags via sed, build, then reverse-sed to restore.
 define build-with-custom-prefix
 	$(call validate-prefix)
 	@if [ "$(CUSTOM_PREFIX)" != "PICOCLAW_" ]; then \
 		echo "  Applying custom prefix to struct tags: $(CUSTOM_PREFIX)"; \
 		find pkg cmd web/backend -name '*.go' ! -name '*_test.go' \
-			-exec grep -El 'envPrefix:"PICOCLAW_|env:"PICOCLAW_' {} + > /tmp/zhosclaw-sed-files; \
-		< /tmp/zhosclaw-sed-files xargs sed $(SED_INPLACE) \
-			-e 's/envPrefix:"PICOCLAW_/envPrefix:"$(CUSTOM_PREFIX)/g' \
-			-e 's/env:"PICOCLAW_/env:"$(CUSTOM_PREFIX)/g'; \
+			-exec grep -El 'envPrefix:"PICOCLAW_|env:"PICOCLAW_' {} + | \
+			xargs sed $(SED_INPLACE) \
+				-e 's/envPrefix:"PICOCLAW_/envPrefix:"$(CUSTOM_PREFIX)/g' \
+				-e 's/env:"PICOCLAW_/env:"$(CUSTOM_PREFIX)/g'; \
 	fi
 	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(1) ./$(CMD_DIR)
 	@if [ "$(CUSTOM_PREFIX)" != "PICOCLAW_" ]; then \
-		< /tmp/zhosclaw-sed-files xargs git checkout -- 2>/dev/null || true; \
-		rm -f /tmp/zhosclaw-sed-files; \
+		find pkg cmd web/backend -name '*.go' ! -name '*_test.go' \
+			-exec grep -El 'envPrefix:"$(CUSTOM_PREFIX)|env:"$(CUSTOM_PREFIX)' {} + | \
+			xargs sed $(SED_INPLACE) \
+				-e 's/envPrefix:"$(CUSTOM_PREFIX)/envPrefix:"PICOCLAW_/g' \
+				-e 's/env:"$(CUSTOM_PREFIX)/env:"PICOCLAW_/g'; \
 	fi
 endef
 
