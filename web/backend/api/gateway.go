@@ -200,6 +200,22 @@ func isLikelyGatewayProcess(pid int) (bool, bool) {
 		return false, true
 	}
 
+	// Read /proc/<pid>/cmdline directly on Linux to get the full command line
+	// including arguments. The ps command on BusyBox/toybox systems (e.g. RK3588)
+	// may only show the executable name without argv, causing isLikelyGatewayProcess
+	// to misidentify the gateway as a non-gateway process and delete its PID file.
+	if runtime.GOOS == "linux" {
+		data, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
+		if err != nil {
+			return false, false
+		}
+		cmdline := strings.ToLower(strings.TrimSpace(strings.ReplaceAll(string(data), "\x00", " ")))
+		if cmdline == "" {
+			return false, true
+		}
+		return looksLikeGatewayCommandLine(cmdline), true
+	}
+
 	out, err := launcherExecCommand("ps", "-o", "command=", "-p", strconv.Itoa(pid)).Output()
 	if err != nil {
 		return false, false

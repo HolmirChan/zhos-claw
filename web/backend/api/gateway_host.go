@@ -52,9 +52,18 @@ func (h *Handler) effectiveGatewayBindHost(cfg *config.Config) string {
 func gatewayProbeHost(bindHost string) string {
 	plan, err := netbind.BuildPlan(bindHost, netbind.DefaultLoopback)
 	if err != nil || strings.TrimSpace(plan.ProbeHost) == "" {
-		return netbind.ResolveAdaptiveLoopbackHost()
+		return resolveToNumericLoopback(netbind.ResolveAdaptiveLoopbackHost())
 	}
-	return plan.ProbeHost
+	return resolveToNumericLoopback(plan.ProbeHost)
+}
+
+// resolveToNumericLoopback converts "localhost" to "127.0.0.1" for systems
+// that lack /etc/hosts and cannot resolve the hostname via DNS.
+func resolveToNumericLoopback(host string) string {
+	if strings.EqualFold(strings.TrimSpace(host), "localhost") {
+		return "127.0.0.1"
+	}
+	return host
 }
 
 func (h *Handler) gatewayProxyURL() *url.URL {
