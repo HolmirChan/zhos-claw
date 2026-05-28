@@ -105,14 +105,18 @@ Co-Authored-By: Claude Code
 
 - 需求池: `.scrum/BACKLOG.md`
 - 迭代文件: `.scrum/sprint_*.md`
+- 设计文档: `.scrum/specs/YYYY-MM-DD-<topic>-design.md`
+- 实现计划: `.scrum/plans/YYYY-MM-DD-<topic>.md`
 - 当前迭代由 BACKLOG.md 顶部元数据行声明
 - 文档模板: `.scrum/TemplateDescript.md`
+- 完整流程规则见技能 `holmir-scrum-init`
 
 ### 协作规则
 
-1. **需求澄清**: 新需求先通过 brainstorming 讨论，确认意图和方案方向后写入 BACKLOG.md「待规划」区
-2. **迭代启动**: 从 BACKLOG.md 挑选条目，通过 writing-plans 拆解为任务，生成 `sprint_NNN.md`
-3. **迭代进行**: 按 Sprint Backlog 执行，同步更新子任务状态（`[ ]` / `[~]` / `[x]`），遇到偏离触发 brainstorming
-4. **迭代关闭**: 已完成条目从 BACKLOG.md「待规划」移到「已交付」，补上 `已完成于 sprint_NNN.md`；未完成项回写「待规划」；Sprint 文件保留
-5. **BACKLOG.md 只排序不标优先级/日期**，时间承诺只在 Sprint 文件中体现
-6. **CLAUDE.md 为纯规则文件**，不随迭代变更
+1. **需求澄清**：调用 `superpowers:brainstorming`，产出设计文档到 `.scrum/specs/`，review 通过后将需求概要写入 BACKLOG.md「待规划」区
+2. **迭代启动**：调用 `superpowers:writing-plans`，产出实现计划到 `.scrum/plans/`，再生成 `sprint_NNN.md`（引用对应设计文档和计划文件路径）
+3. **迭代进行**：按 sprint 文件执行（subagent-driven 或 executing-plans），同步更新子任务状态（`[ ]` / `[~]` / `[x]`），遇到偏离回退 brainstorming
+4. **迭代关闭**：已完成条目从 BACKLOG.md「待规划」移到「已交付」，补上 `已完成于 sprint_NNN.md`；Sprint 补完成时间；未完成项回写「待规划」
+5. **先行后续**：设计文档 → 实现计划 → Sprint 文件，三步顺序执行，不跳过
+6. **BACKLOG.md 只排序不标优先级/日期**，时间承诺只在 Sprint 文件中体现
+7. **CLAUDE.md 为纯规则文件**，不随迭代变更

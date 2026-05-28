@@ -13,7 +13,7 @@ HOME_DIR_NAME=$(grep 'DefaultHome' "$ENV_GO" | grep -o '"\.[a-z]*"' | tr -d '"')
 DEVICE_IP=${DEVICE_IP:-"192.168.1.100"}
 DEVICE_PORT=${DEVICE_PORT:-"5555"}
 REMOTE_DIR="/data/${CMD}"
-PICOCLAW_HOME_DIR="/opt/${CMD}/${HOME_DIR_NAME}"
+PICOCLAW_HOME_DIR="${REMOTE_DIR}/${HOME_DIR_NAME}"
 LOG_DIR="${PICOCLAW_HOME_DIR}/logs"
 HDC="hdc -t ${DEVICE_IP}:${DEVICE_PORT}"
 
@@ -27,7 +27,7 @@ hdc tconn "${DEVICE_IP}:${DEVICE_PORT}"
 
 echo "==> Stopping existing processes..."
 ${HDC} shell "pkill -f ${CMD}-web || true; pkill -f ${CMD} || true"
-${HDC} shell "mkdir -p ${REMOTE_DIR} ${PICOCLAW_HOME_DIR} ${LOG_DIR}"
+${HDC} shell "mkdir -p ${REMOTE_DIR} ${PICOCLAW_HOME_DIR}"
 
 echo "==> Uploading files..."
 ${HDC} file send "${ASSETS_DIR}/cert.pem"              "${REMOTE_DIR}/cert.pem"
@@ -35,10 +35,9 @@ ${HDC} file send "${ASSETS_DIR}/zaiagent_ed25519.key"  "${PICOCLAW_HOME_DIR}/${C
 ${HDC} file send "build/${CMD}-linux-arm"              "${REMOTE_DIR}/${CMD}-linux-arm"
 ${HDC} file send "build/${CMD}-web-linux-arm"          "${REMOTE_DIR}/${CMD}-web-linux-arm"
 
-echo "==> Setting permissions and symlink..."
+echo "==> Setting permissions..."
 ${HDC} shell "chmod +x ${REMOTE_DIR}/${CMD}-linux-arm ${REMOTE_DIR}/${CMD}-web-linux-arm"
 ${HDC} shell "chmod 600 ${PICOCLAW_HOME_DIR}/${CMD}_ed25519.key"
-${HDC} shell "ln -sf ${REMOTE_DIR}/${CMD}-linux-arm ${REMOTE_DIR}/${CMD}"
 
 echo "==> Initializing home directory (first deploy only)..."
 CONFIG_EXISTS=$(${HDC} shell "ls ${PICOCLAW_HOME_DIR}/config.json 2>/dev/null && echo yes || echo no")
@@ -60,7 +59,9 @@ cat > "/tmp/${INIT_NAME}" << EOF
 export ${PREFIX}HOME=${PICOCLAW_HOME_DIR}
 export ${PREFIX}SSH_KEY_PATH=${PICOCLAW_HOME_DIR}/${CMD}_ed25519.key
 export ${PREFIX}KEY_PASSPHRASE=${PASSPHRASE}
+export ${PREFIX}BINARY=${REMOTE_DIR}/${CMD}-linux-arm
 export SSL_CERT_FILE=${REMOTE_DIR}/cert.pem
+mkdir -p ${LOG_DIR}
 GODEBUG=asyncpreemptoff=1 nohup ${REMOTE_DIR}/${CMD}-web-linux-arm -public >> ${LOG_DIR}/launcher.log 2>&1 &
 EOF
 ${HDC} file send "/tmp/${INIT_NAME}" "/etc/init.d/${INIT_NAME}"

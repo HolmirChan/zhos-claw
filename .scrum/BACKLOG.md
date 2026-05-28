@@ -1,21 +1,45 @@
 # Backlog
 
-> 当前迭代: sprint_004.md
+> 当前迭代: 无
 
 ## 待规划
+
+### BL-008 · 语音交互支持
+- **意图**: Agent 支持语音输入（STT）和语音输出（TTS），Web UI 和 CLI 均可使用
+- **方案方向**: 接入语音识别/合成 API（如 OpenAI Whisper/TTS、Azure Speech），Web 前端增加录音按钮和音频播放组件；pkg/providers 新增 speech provider 抽象
+- **设计文档**: .scrum/specs/2026-05-28-web-voice-support-design.md
+- **实现计划**: .scrum/plans/2026-05-28-web-voice-support.md
+- **验收标准**:
+  - [ ] Web 对话页支持语音输入（点击录音 → STT → 填入输入框）
+  - [ ] Agent 回复支持语音朗读（TTS → 音频播放）
+  - [ ] 语音识别支持中文
+
+## 已交付
+
+### BL-007 · RK3588 一键部署
+- **意图**: 一条命令完成构建→推送→初始化→启动，解决设备无 /etc/hosts、无 CA 证书、toybox 环境等兼容性问题
+- **方案方向**: 完善 `scripts/deploy-rk3588.sh`，补全启动脚本，自动配置 SSL_CERT_FILE、生成适合设备的 config.json
+- **设计文档**: -
+- **实现计划**: -
+- **已完成于**: 直接验收
+- **验收标准**:
+  - [x] `DEVICE_IP=x.x.x.x ./deploy-rk3588.sh` 一键部署并启动
+  - [x] 部署后浏览器登录、WebSocket 连接、Agent 对话均正常
+  - [x] 设备重启后服务自动启动
 
 ### BL-006 · Web 前端品牌定制
 - **意图**: Web UI 中所有用户可见的品牌文字（标题、文案、组件、i18n）替换为当前品牌值（ZaiAgent），logo 图片替换，外部文档链接移除
 - **方案方向**: index.html 标题、i18n 文案、组件内硬编码文字、路径占位符全部修改；logo_with_text.png 替换；docs.picoclaw.io 链接删除；localStorage key 和 data 属性保持不动
+- **设计文档**: .scrum/specs/2026-05-27-custom-branding-design.md
+- **实现计划**: .scrum/plans/2026-05-27-custom-branding.md
+- **已完成于**: sprint_004.md
 - **验收标准**:
-  - [ ] 页面标题为 ZaiAgent
-  - [ ] UI 中不再出现 "PicoClaw" 文字
-  - [ ] 外部文档链接已移除
-  - [ ] `~/.picoclaw` 路径占位符替换为 `~/.zaiagent`
-  - [ ] MQTT 默认 topic 前缀替换为 `/zaiagent`
-  - [ ] localStorage key 和 data 属性未被改动
-
-## 已交付
+  - [x] 页面标题为 ZaiAgent
+  - [x] UI 中不再出现 "PicoClaw" 文字
+  - [x] 外部文档链接已移除
+  - [x] `~/.picoclaw` 路径占位符替换为 `~/.zaiagent`
+  - [x] MQTT 默认 topic 前缀替换为 `/zaiagent`
+  - [x] localStorage key 和 data 属性未被改动
 
 ### BL-001 · 跑通启动流程 — 理解 onboard → auth → gateway → agent 完整链路
 - **意图**: 从零到能跟 Agent 对话，理解每条命令做了什么、产生了哪些文件、模块之间怎么连接
@@ -31,7 +55,7 @@
 ### BL-004 · OpenHarmony L1 (RK3506) 适配 MVP
 - **意图**: 让 ZhosClaw 在 RK3506（ARM Cortex-A7，Linux）上运行，局域网内浏览器访问 Web UI，自然语言驱动 Agent 执行 shell 命令
 - **方案方向**: 新增 `build-rk3506` Makefile target（GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0）+ 一键部署脚本；利用已有 ExecTool 实现 shell 执行；Web UI 使用现有 picoclaw-launcher（后续重命名为 zhosclaw-web）
-- **设计文档**: `docs/superpowers/specs/2026-05-25-openharmony-l1-rk3506-design.md`
+- **设计文档**: `.scrum/specs/2026-05-25-openharmony-l1-rk3506-design.md`
 - **已完成于**: sprint_002.md
 - **验收标准**:
   - [x] `make build-rk3506` 产出 4 个产物（2 个 ARM 二进制 + 2 个本机调试二进制）
@@ -43,7 +67,7 @@
 ### BL-005 · 品牌一键替换 — 定制小龙虾
 - **意图**: 在 `pkg/env.go` 改一处常量 + Makefile 变量，`make build` 产出完全换牌的二进制（env 前缀、二进制名、默认目录、显示名）
 - **方案方向**: `pkg/env.go` 集中管理品牌变量；所有 env 读取统一走 `pkg.GetEnv()` 支持向下兼容；struct tag 通过构建时 sed 替换；Makefile 加 `CUSTOM_PREFIX` 变量
-- **设计文档**: `docs/superpowers/specs/2026-05-27-custom-branding-design.md`
+- **设计文档**: `.scrum/specs/2026-05-27-custom-branding-design.md`
 - **已完成于**: sprint_003.md
 - **验收标准**:
   - [x] `make build` 默认前缀编译通过
@@ -51,5 +75,4 @@
   - [x] 二进制泄露检查：Struct tag 全部替换，fallback 函数有保留的旧前缀字符串（符合设计）
   - [x] 旧前缀 `PICOCLAW_*` env 仍能正常识别（向下兼容）
   - [x] Web UI 二进制名由 `pkg.CommandName` 控制
-
 

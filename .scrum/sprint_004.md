@@ -1,9 +1,10 @@
 # Sprint 4
 
 > 创建: 2026-05-27
+> 完成: 2026-05-28
 > 目标版本: -
 > 来源: BACKLOG.md（BL-006）
-> 状态: 进行中
+> 状态: 已完成
 
 ## 任务清单
 
@@ -42,9 +43,9 @@
   - [x] 提交
 - **阻塞**: -
 
-### SB-005 · logo 图片替换 [ ]
+### SB-005 · logo 图片替换 [x]
 - **来源**: BL-006
 - **子任务**:
-  - [ ] `public/logo_with_text.png` — 替换为 ZaiAgent 版本的 logo 图片（需用户提供新图片）
-  - [ ] 提交
-- **阻塞**: 需要用户提供新的 logo_with_text.png
+  - [x] `public/logo_with_text.png` — 替换为 ZaiAgent 版本的 logo 图片
+  - [x] 提交
+- **阻塞**: -
