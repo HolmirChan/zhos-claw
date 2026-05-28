@@ -27,7 +27,7 @@ func DefaultConfig() *Config {
 			Defaults: AgentDefaults{
 				Workspace:                 workspacePath,
 				RestrictToWorkspace:       true,
-				Provider:                  "",
+				Provider:                  "deepseek",
 				ModelName:                 "deepseek-v4-flash",
 				MaxTokens:                 128000,
 				Temperature:               nil, // nil means use provider default
@@ -70,14 +70,14 @@ func DefaultConfig() *Config {
 			// ============================================
 
 			// DeepSeek V4 Flash (default)
-				{
-					ModelName: "deepseek-v4-flash",
-					Provider:  "deepseek",
-					Model:     "deepseek/deepseek-v4-flash",
-					APIBase:   "https://api.deepseek.com/v1",
-				},
+			{
+				ModelName: "deepseek-v4-flash",
+				Provider:  "deepseek",
+				Model:     "deepseek/deepseek-v4-flash",
+				APIBase:   "https://api.deepseek.com/v1",
+			},
 
-				// Zhipu AI (智谱) - https://open.bigmodel.cn/usercenter/apikeys
+			// Zhipu AI (智谱) - https://open.bigmodel.cn/usercenter/apikeys
 			{
 				ModelName: "glm-4.7",
 				Provider:  "zhipu",
