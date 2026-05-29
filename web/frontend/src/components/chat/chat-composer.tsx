@@ -1,4 +1,5 @@
 import { IconArrowUp, IconPhotoPlus, IconX } from "@tabler/icons-react"
+import { useState } from "react"
 import type { KeyboardEvent } from "react"
 import { useTranslation } from "react-i18next"
 import TextareaAutosize from "react-textarea-autosize"
@@ -11,6 +12,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { useVoice } from "@/hooks/use-voice"
+import { VoiceRecorder } from "./voice-recorder"
 import type { ChatAttachment, ContextUsage } from "@/store/chat"
 
 export type ChatInputDisabledReason =
@@ -51,6 +54,8 @@ export function ChatComposer({
   contextUsage,
 }: ChatComposerProps) {
   const { t } = useTranslation()
+  const { outputEnabled, asrAvailable, ttsAvailable, toggleOutput } = useVoice()
+  const [showRecorder, setShowRecorder] = useState(false)
   const canInput = inputDisabledReason === null
   const disabledMessage =
     inputDisabledReason === null
@@ -95,6 +100,16 @@ export function ChatComposer({
           </div>
         )}
 
+        {showRecorder && asrAvailable && (
+          <VoiceRecorder
+            onTranscribed={(text) => {
+              onInputChange(text)
+              setShowRecorder(false)
+              onSend()
+            }}
+          />
+        )}
+
         <TextareaAutosize
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
@@ -124,6 +139,34 @@ export function ChatComposer({
             >
               <IconPhotoPlus className="size-4" />
             </Button>
+            {asrAvailable && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={`text-muted-foreground hover:text-foreground h-8 w-8 rounded-full ${showRecorder ? "bg-violet-100 text-violet-600" : ""}`}
+                onClick={() => setShowRecorder((v) => !v)}
+                disabled={!canInput}
+                title={showRecorder ? "关闭语音输入" : "语音输入"}
+                aria-label={showRecorder ? "关闭语音输入" : "语音输入"}
+              >
+                <span className="text-base">{showRecorder ? "🎙️" : "🎤"}</span>
+              </Button>
+            )}
+            {ttsAvailable && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={`text-muted-foreground hover:text-foreground h-8 w-8 rounded-full ${outputEnabled ? "bg-violet-100 text-violet-600" : ""}`}
+                onClick={toggleOutput}
+                disabled={!canInput}
+                title={outputEnabled ? "关闭语音朗读" : "开启语音朗读"}
+                aria-label={outputEnabled ? "关闭语音朗读" : "开启语音朗读"}
+              >
+                <span className="text-base">{outputEnabled ? "🔊" : "🔈"}</span>
+              </Button>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">
