@@ -131,7 +131,7 @@ func (h *Handler) handleVoiceSynthesize(w http.ResponseWriter, r *http.Request) 
 	}
 	defer audioStream.Close()
 
-	ext := ".ogg"
+	ext := ".mp3"
 	if provider.Name() == "mimo-tts" {
 		ext = ".mp3"
 	}

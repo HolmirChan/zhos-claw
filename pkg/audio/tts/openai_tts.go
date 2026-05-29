@@ -20,10 +20,17 @@ type OpenAITTSProvider struct {
 	apiBase    string
 	voice      string
 	model      string
+	format     string
 	httpClient *http.Client
 }
 
-func NewOpenAITTSProvider(apiKey string, apiBase string, proxyURL string, model string) *OpenAITTSProvider {
+func NewOpenAITTSProvider(
+	apiKey string,
+	apiBase string,
+	proxyURL string,
+	model string,
+	format string,
+) *OpenAITTSProvider {
 	// Normalize apiBase to avoid malformed endpoints like
 	// "https://api.openai.com/audio/speech" when "/v1" is required.
 	if apiBase == "" {
@@ -75,11 +82,17 @@ func NewOpenAITTSProvider(apiKey string, apiBase string, proxyURL string, model 
 		model = "tts-1"
 	}
 
+	format = strings.TrimSpace(format)
+	if format == "" {
+		format = "mp3"
+	}
+
 	return &OpenAITTSProvider{
 		apiKey:     apiKey,
 		apiBase:    apiBase,
 		voice:      "alloy",
 		model:      model,
+		format:     format,
 		httpClient: client,
 	}
 }
@@ -95,7 +108,7 @@ func (t *OpenAITTSProvider) Synthesize(ctx context.Context, text string) (io.Rea
 		"model":           t.model,
 		"input":           text,
 		"voice":           t.voice,
-		"response_format": "opus",
+		"response_format": t.format,
 	}
 
 	jsonData, err := json.Marshal(reqBody)

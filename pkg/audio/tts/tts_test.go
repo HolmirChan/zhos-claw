@@ -52,7 +52,7 @@ func TestNewOpenAITTSProvider_APIBaseNormalization(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			provider := NewOpenAITTSProvider("key", tc.input, "", "")
+			provider := NewOpenAITTSProvider("key", tc.input, "", "", "")
 			if provider.apiBase != tc.expect {
 				t.Fatalf("apiBase mismatch: got %q, want %q", provider.apiBase, tc.expect)
 			}
@@ -82,7 +82,7 @@ func TestOpenAITTSProvider_SynthesizeSuccess(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := NewOpenAITTSProvider("k123", server.URL, "", "")
+	provider := NewOpenAITTSProvider("k123", server.URL, "", "", "")
 	stream, err := provider.Synthesize(context.Background(), "hello")
 	if err != nil {
 		t.Fatalf("Synthesize failed: %v", err)
@@ -122,7 +122,7 @@ func TestOpenAITTSProvider_SynthesizeNon200(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := NewOpenAITTSProvider("k123", server.URL, "", "")
+	provider := NewOpenAITTSProvider("k123", server.URL, "", "", "")
 	_, err := provider.Synthesize(context.Background(), "hello")
 	if err == nil {
 		t.Fatal("expected error")
@@ -135,7 +135,7 @@ func TestOpenAITTSProvider_SynthesizeNon200(t *testing.T) {
 func TestNewOpenAITTSProvider_UsesConfiguredModel(t *testing.T) {
 	t.Parallel()
 
-	provider := NewOpenAITTSProvider("key", "https://api.xiaomimimo.com/v1", "", "mimo-v2-tts")
+	provider := NewOpenAITTSProvider("key", "https://api.xiaomimimo.com/v1", "", "mimo-v2-tts", "")
 	if provider.model != "mimo-v2-tts" {
 		t.Fatalf("model mismatch: got %q, want %q", provider.model, "mimo-v2-tts")
 	}
