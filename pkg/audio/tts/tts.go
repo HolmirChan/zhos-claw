@@ -19,7 +19,7 @@ type TTSProvider interface {
 	Synthesize(ctx context.Context, text string) (io.ReadCloser, error)
 }
 
-func providerFromModelConfig(mc *config.ModelConfig, format string) TTSProvider {
+func providerFromModelConfig(mc *config.ModelConfig, format string, voice string) TTSProvider {
 	if mc == nil || mc.APIKey() == "" {
 		return nil
 	}
@@ -33,7 +33,7 @@ func providerFromModelConfig(mc *config.ModelConfig, format string) TTSProvider 
 	case "mimo":
 		return NewMimoTTSProvider(mc.APIKey(), providers.ResolveAPIBase(mc), modelID, mc.Proxy)
 	default:
-		return NewOpenAITTSProvider(mc.APIKey(), providers.ResolveAPIBase(mc), mc.Proxy, modelID, format)
+		return NewOpenAITTSProvider(mc.APIKey(), providers.ResolveAPIBase(mc), mc.Proxy, modelID, format, voice)
 	}
 }
 
@@ -43,10 +43,11 @@ func DetectTTS(cfg *config.Config) TTSProvider {
 	}
 
 	format := strings.TrimSpace(cfg.Voice.TTSFormat)
+	voice := strings.TrimSpace(cfg.Voice.TTSVoice)
 
 	if modelName := strings.TrimSpace(cfg.Voice.TTSModelName); modelName != "" {
 		if mc, err := cfg.GetModelConfig(modelName); err == nil {
-			if provider := providerFromModelConfig(mc, format); provider != nil {
+			if provider := providerFromModelConfig(mc, format, voice); provider != nil {
 				return provider
 			}
 		}
@@ -54,7 +55,7 @@ func DetectTTS(cfg *config.Config) TTSProvider {
 
 	for _, mc := range cfg.ModelList {
 		if strings.Contains(strings.ToLower(mc.Model), "tts") && mc.APIKey() != "" {
-			if provider := providerFromModelConfig(mc, format); provider != nil {
+			if provider := providerFromModelConfig(mc, format, voice); provider != nil {
 				return provider
 			}
 		}

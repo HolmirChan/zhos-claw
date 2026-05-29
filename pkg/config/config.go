@@ -693,6 +693,7 @@ type VoiceConfig struct {
 	ModelName         string `json:"model_name,omitempty"         env:"PICOCLAW_VOICE_MODEL_NAME"`
 	TTSModelName      string `json:"tts_model_name,omitempty"     env:"PICOCLAW_VOICE_TTS_MODEL_NAME"`
 	TTSFormat         string `json:"tts_format,omitempty"         env:"PICOCLAW_VOICE_TTS_FORMAT"`
+	TTSVoice          string `json:"tts_voice,omitempty"          env:"PICOCLAW_VOICE_TTS_VOICE"`
 	EchoTranscription bool   `json:"echo_transcription"           env:"PICOCLAW_VOICE_ECHO_TRANSCRIPTION"`
 	ElevenLabsAPIKey  string `json:"elevenlabs_api_key,omitempty" env:"PICOCLAW_VOICE_ELEVENLABS_API_KEY"`
 }

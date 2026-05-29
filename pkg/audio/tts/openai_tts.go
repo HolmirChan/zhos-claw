@@ -30,6 +30,7 @@ func NewOpenAITTSProvider(
 	proxyURL string,
 	model string,
 	format string,
+	voice string,
 ) *OpenAITTSProvider {
 	// Normalize apiBase to avoid malformed endpoints like
 	// "https://api.openai.com/audio/speech" when "/v1" is required.
@@ -87,10 +88,15 @@ func NewOpenAITTSProvider(
 		format = "mp3"
 	}
 
+	voice = strings.TrimSpace(voice)
+	if voice == "" {
+		voice = "alloy"
+	}
+
 	return &OpenAITTSProvider{
 		apiKey:     apiKey,
 		apiBase:    apiBase,
-		voice:      "alloy",
+		voice:      voice,
 		model:      model,
 		format:     format,
 		httpClient: client,
