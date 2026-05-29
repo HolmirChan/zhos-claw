@@ -34,7 +34,7 @@ func supportsAudioTranscription(modelCfg *config.ModelConfig) bool {
 		"ollama", "moonshot", "shengsuanyun", "deepseek", "cerebras",
 		"vivgrid", "volcengine", "vllm", "qwen", "qwen-portal", "qwen-intl", "qwen-international", "dashscope-intl",
 		"qwen-us", "dashscope-us", "mistral", "avian", "minimax", "longcat", "modelscope", "novita",
-		"coding-plan", "alibaba-coding", "qwen-coding", "zai":
+		"coding-plan", "alibaba-coding", "qwen-coding", "zai", "siliconflow":
 		// These protocols all go through the OpenAI-compatible or Azure provider path in
 		// providers.CreateProviderFromConfig, so they are the only ones that can supply
 		// the audio media payload shape expected by NewAudioModelTranscriber.
@@ -55,7 +55,7 @@ func supportsWhisperTranscription(modelCfg *config.ModelConfig) bool {
 		"ollama", "moonshot", "shengsuanyun", "deepseek", "cerebras",
 		"vivgrid", "volcengine", "vllm", "qwen", "qwen-portal", "qwen-intl", "qwen-international", "dashscope-intl",
 		"qwen-us", "dashscope-us", "mistral", "avian", "minimax", "longcat", "modelscope", "novita",
-		"coding-plan", "alibaba-coding", "qwen-coding", "zai", "mimo":
+		"coding-plan", "alibaba-coding", "qwen-coding", "zai", "mimo", "siliconflow":
 		return true
 	default:
 		return false
@@ -72,10 +72,7 @@ func whisperModelID(modelCfg *config.ModelConfig) string {
 	}
 
 	_, modelID := providers.ExtractProtocol(modelCfg)
-	if strings.Contains(strings.ToLower(modelID), "whisper") {
-		return modelID
-	}
-	return ""
+	return modelID
 }
 
 func isElevenLabsTranscriptionModel(modelCfg *config.ModelConfig) bool {
