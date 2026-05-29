@@ -1,9 +1,7 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -39,13 +37,13 @@ func (h *Handler) handleVoiceTranscribe(w http.ResponseWriter, r *http.Request) 
 	r.Body = http.MaxBytesReader(w, r.Body, maxVoiceUploadSize)
 
 	if err := r.ParseMultipartForm(maxVoiceUploadSize); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to parse form: %v", err), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "文件过大或解析失败"})
 		return
 	}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Missing file field: %v", err), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺少音频文件"})
 		return
 	}
 	defer file.Close()
@@ -53,33 +51,33 @@ func (h *Handler) handleVoiceTranscribe(w http.ResponseWriter, r *http.Request) 
 	ext := filepath.Ext(header.Filename)
 	tmpFile, err := os.CreateTemp("", "voice-upload-*"+ext)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create temp file: %v", err), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "服务器错误"})
 		return
 	}
 	defer os.Remove(tmpFile.Name())
 
 	if _, err := io.Copy(tmpFile, file); err != nil {
 		tmpFile.Close()
-		http.Error(w, fmt.Sprintf("Failed to save upload: %v", err), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存文件失败"})
 		return
 	}
 	tmpFile.Close()
 
 	cfg, err := config.LoadConfig(h.configPath)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to load config: %v", err), http.StatusInternalServerError)
+		writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "未配置语音识别"})
 		return
 	}
 
 	transcriber := asr.DetectTranscriber(cfg)
 	if transcriber == nil {
-		http.Error(w, "No ASR provider configured", http.StatusBadRequest)
+		writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "未配置语音识别"})
 		return
 	}
 
-	result, err := transcriber.Transcribe(context.Background(), tmpFile.Name())
+	result, err := transcriber.Transcribe(r.Context(), tmpFile.Name())
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Transcription failed: %v", err), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "语音识别失败: " + err.Error()})
 		return
 	}
 
@@ -101,38 +99,34 @@ func (h *Handler) handleVoiceSynthesize(w http.ResponseWriter, r *http.Request) 
 	var req struct {
 		Text string `json:"text"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, fmt.Sprintf("Invalid JSON body: %v", err), http.StatusBadRequest)
-		return
-	}
-	if req.Text == "" {
-		http.Error(w, "text is required", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Text == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺少 text 参数"})
 		return
 	}
 
 	cfg, err := config.LoadConfig(h.configPath)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to load config: %v", err), http.StatusInternalServerError)
+		writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "未配置 TTS"})
 		return
 	}
 
 	provider := tts.DetectTTS(cfg)
 	if provider == nil {
-		http.Error(w, "No TTS provider configured", http.StatusBadRequest)
+		writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "未配置 TTS"})
 		return
 	}
 
 	cacheDir := filepath.Join(config.GetHome(), "tts-cache")
 	if err := os.MkdirAll(cacheDir, 0700); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create cache dir: %v", err), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "创建缓存目录失败"})
 		return
 	}
 
 	cleanTTSCache(cacheDir, time.Hour)
 
-	audioStream, err := provider.Synthesize(context.Background(), req.Text)
+	audioStream, err := provider.Synthesize(r.Context(), req.Text)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("TTS synthesis failed: %v", err), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "TTS 合成失败"})
 		return
 	}
 	defer audioStream.Close()
@@ -144,14 +138,14 @@ func (h *Handler) handleVoiceSynthesize(w http.ResponseWriter, r *http.Request) 
 
 	tmp, err := os.CreateTemp(cacheDir, "tts-*"+ext)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create temp file: %v", err), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "创建缓存文件失败"})
 		return
 	}
 
 	if _, err := io.Copy(tmp, audioStream); err != nil {
 		tmp.Close()
 		os.Remove(tmp.Name())
-		http.Error(w, fmt.Sprintf("Failed to write audio: %v", err), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "写入音频失败"})
 		return
 	}
 	tmp.Close()
@@ -167,7 +161,7 @@ func (h *Handler) handleVoiceSynthesize(w http.ResponseWriter, r *http.Request) 
 func (h *Handler) handleVoiceAudio(w http.ResponseWriter, r *http.Request) {
 	fileID := filepath.Base(r.PathValue("file_id"))
 	if fileID == "" || fileID == "." || fileID == ".." {
-		http.Error(w, "Invalid file ID", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "无效的文件 ID"})
 		return
 	}
 
