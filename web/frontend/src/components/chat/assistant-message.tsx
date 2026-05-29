@@ -7,7 +7,7 @@ import {
   IconFileText,
   IconTool,
 } from "@tabler/icons-react"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import ReactMarkdown from "react-markdown"
 import rehypeHighlight from "rehype-highlight"
@@ -28,6 +28,11 @@ import {
   type ChatAttachment,
   type ChatToolCall,
 } from "@/store/chat"
+import { useAtomValue } from "jotai"
+
+import { synthesizeSpeech } from "@/api/voice"
+import { AudioPlayer } from "./audio-player"
+import { voiceOutputAtom } from "@/store/voice"
 
 interface AssistantMessageProps {
   content: string
@@ -35,6 +40,7 @@ interface AssistantMessageProps {
   kind?: AssistantMessageKind
   toolCalls?: ChatToolCall[]
   timestamp?: string | number
+  isComplete?: boolean
 }
 
 export function AssistantMessage({
@@ -43,6 +49,7 @@ export function AssistantMessage({
   kind = "normal",
   toolCalls = [],
   timestamp = "",
+  isComplete = false,
 }: AssistantMessageProps) {
   const { t } = useTranslation()
   const { copy, isCopied } = useCopyToClipboard()
@@ -66,6 +73,35 @@ export function AssistantMessage({
   const copyMessageLabel = isCopied
     ? t("chat.copiedLabel")
     : t("chat.copyMessage")
+
+  const outputEnabled = useAtomValue(voiceOutputAtom)
+  const [ttsLoading, setTtsLoading] = useState(false)
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const ttsTriggeredRef = useRef(false)
+
+  useEffect(() => {
+    if (!isComplete || !content?.trim()) return
+    if (ttsTriggeredRef.current) return
+    ttsTriggeredRef.current = true
+
+    if (!outputEnabled) return
+
+    let cancelled = false
+
+    setTtsLoading(true)
+    synthesizeSpeech(content)
+      .then((res) => {
+        if (!cancelled) setAudioUrl(res.audio_url)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setTtsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [outputEnabled, isComplete, content])
 
   return (
     <div className="group flex w-full flex-col gap-1.5">
@@ -229,6 +265,16 @@ export function AssistantMessage({
                 <IconCopy className="text-muted-foreground h-4 w-4" />
               )}
             </Button>
+          )}
+          {ttsLoading && (
+            <div className="text-muted-foreground/60 border-t border-border/30 px-4 py-2 text-xs">
+              <span className="inline-block animate-pulse">🔈 正在生成语音...</span>
+            </div>
+          )}
+          {audioUrl && (
+            <div className="border-t border-border/30 px-4 py-2">
+              <AudioPlayer audioUrl={audioUrl} />
+            </div>
           )}
         </div>
       )}

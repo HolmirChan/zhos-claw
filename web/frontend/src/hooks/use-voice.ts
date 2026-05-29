@@ -1,4 +1,4 @@
-import { useAtom, useSetAtom } from "jotai";
+import { useAtom } from "jotai";
 import { useEffect, useCallback } from "react";
 import { fetchVoiceCapabilities } from "@/api/voice";
 import {

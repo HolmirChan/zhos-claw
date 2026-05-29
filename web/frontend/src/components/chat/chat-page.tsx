@@ -378,6 +378,7 @@ export function ChatPage() {
                     kind={msg.kind}
                     toolCalls={msg.toolCalls}
                     timestamp={msg.timestamp}
+                    isComplete={!isTyping}
                   />
                 ) : (
                   <UserMessage
