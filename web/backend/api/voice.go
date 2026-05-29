@@ -56,7 +56,7 @@ func (h *Handler) handleVoiceTranscribe(w http.ResponseWriter, r *http.Request) 
 	}
 	defer os.Remove(tmpFile.Name())
 
-	if _, err := io.Copy(tmpFile, file); err != nil {
+	if _, copyErr := io.Copy(tmpFile, file); copyErr != nil {
 		tmpFile.Close()
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存文件失败"})
 		return
@@ -117,7 +117,7 @@ func (h *Handler) handleVoiceSynthesize(w http.ResponseWriter, r *http.Request) 
 	}
 
 	cacheDir := filepath.Join(config.GetHome(), "tts-cache")
-	if err := os.MkdirAll(cacheDir, 0700); err != nil {
+	if mkdirErr := os.MkdirAll(cacheDir, 0o700); mkdirErr != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "创建缓存目录失败"})
 		return
 	}
