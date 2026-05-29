@@ -81,6 +81,7 @@ export function AssistantMessage({
 
   useEffect(() => {
     if (!isComplete || !content?.trim()) return
+    if (kind !== "normal") return
     if (ttsTriggeredRef.current) return
     ttsTriggeredRef.current = true
 
@@ -101,7 +102,7 @@ export function AssistantMessage({
     return () => {
       cancelled = true
     }
-  }, [outputEnabled, isComplete, content])
+  }, [outputEnabled, isComplete, content, kind])
 
   return (
     <div className="group flex w-full flex-col gap-1.5">
