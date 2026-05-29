@@ -83,6 +83,11 @@ func (h *Handler) handleVoiceTranscribe(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if result.Text == "" {
+		writeJSON(w, http.StatusOK, map[string]string{"text": "", "error": "未识别到语音"})
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]string{
 		"text":     result.Text,
 		"language": result.Language,
@@ -117,13 +122,6 @@ func (h *Handler) handleVoiceSynthesize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	audioStream, err := provider.Synthesize(context.Background(), req.Text)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("TTS synthesis failed: %v", err), http.StatusInternalServerError)
-		return
-	}
-	defer audioStream.Close()
-
 	cacheDir := filepath.Join(config.GetHome(), "tts-cache")
 	if err := os.MkdirAll(cacheDir, 0700); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to create cache dir: %v", err), http.StatusInternalServerError)
@@ -131,6 +129,13 @@ func (h *Handler) handleVoiceSynthesize(w http.ResponseWriter, r *http.Request) 
 	}
 
 	cleanTTSCache(cacheDir, time.Hour)
+
+	audioStream, err := provider.Synthesize(context.Background(), req.Text)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("TTS synthesis failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer audioStream.Close()
 
 	ext := ".ogg"
 	if provider.Name() == "mimo-tts" {
