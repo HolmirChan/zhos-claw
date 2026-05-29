@@ -51,9 +51,9 @@ var (
 	runPicoclawVersionOutput    = executePicoclawVersion
 	currentGatewayVersionState  = gatewayVersionState
 	launcherBuildInfoForVersion = fallbackSystemVersionInfoFromConfig
-	versionInfoCache  = newSystemVersionCache()
-	ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)
-	versionLinePattern *regexp.Regexp
+	versionInfoCache            = newSystemVersionCache()
+	ansiEscapePattern           = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	versionLinePattern          *regexp.Regexp
 )
 
 func init() {

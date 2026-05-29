@@ -18,10 +18,8 @@ const (
 	DefaultPort = 18800
 )
 
-var (
-	// EnvLauncherHost overrides launcher listen host.
-	EnvLauncherHost = pkg.EnvPrefix + "LAUNCHER_HOST"
-)
+// EnvLauncherHost overrides launcher listen host.
+var EnvLauncherHost = pkg.EnvPrefix + "LAUNCHER_HOST"
 
 // Config stores launch parameters for the web backend service.
 type Config struct {

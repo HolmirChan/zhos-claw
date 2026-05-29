@@ -512,7 +512,7 @@ func channelSettingsType(
 }
 
 func derefType(typ reflect.Type) reflect.Type {
-	for typ != nil && typ.Kind() == reflect.Ptr {
+	for typ != nil && typ.Kind() == reflect.Pointer {
 		typ = typ.Elem()
 	}
 	return typ
@@ -622,7 +622,7 @@ func applyConfigSecretsFromMap(cfg *config.Config, raw map[string]any) {
 			continue
 		}
 		rv := reflect.ValueOf(decoded)
-		if rv.Kind() == reflect.Ptr {
+		if rv.Kind() == reflect.Pointer {
 			rv = rv.Elem()
 		}
 		if rv.Kind() != reflect.Struct {
@@ -737,7 +737,7 @@ func applySecureStringsToStruct(rv reflect.Value, rawMap map[string]any) {
 							if existing.Kind() == reflect.Interface {
 								existing = existing.Elem()
 							}
-							if existing.Kind() == reflect.Ptr && !existing.IsNil() {
+							if existing.Kind() == reflect.Pointer && !existing.IsNil() {
 								elem = reflect.New(elemType)
 								elem.Elem().Set(existing.Elem())
 							} else if existing.Kind() == reflect.Struct {

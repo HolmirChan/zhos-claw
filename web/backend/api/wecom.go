@@ -27,7 +27,7 @@ const (
 )
 
 var (
-	wecomQRSourceID = pkg.CommandName
+	wecomQRSourceID          = pkg.CommandName
 	wecomQRHTTPTimeout       = 15 * time.Second
 	wecomDefaultWebSocketURL = "wss://openws.work.weixin.qq.com"
 	wecomPollStartTimeout    = 15 * time.Second
