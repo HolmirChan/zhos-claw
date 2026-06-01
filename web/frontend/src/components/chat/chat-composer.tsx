@@ -54,7 +54,7 @@ export function ChatComposer({
   contextUsage,
 }: ChatComposerProps) {
   const { t } = useTranslation()
-  const { outputEnabled, asrAvailable, ttsAvailable, toggleOutput } = useVoice()
+  const { outputEnabled, asrAvailable, ttsAvailable, streamingAvailable, toggleOutput } = useVoice()
   const [showRecorder, setShowRecorder] = useState(false)
   const canInput = inputDisabledReason === null
   const disabledMessage =
@@ -63,11 +63,20 @@ export function ChatComposer({
       : t(`chat.disabledPlaceholder.${inputDisabledReason}`)
   const placeholder = disabledMessage ?? t("chat.placeholder")
 
+  const handleSend = () => {
+    if (showRecorder && streamingAvailable) {
+      setShowRecorder(false)
+      onSend()
+      return
+    }
+    onSend()
+  }
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      onSend()
+      handleSend()
     }
   }
 
@@ -100,12 +109,16 @@ export function ChatComposer({
           </div>
         )}
 
-        {showRecorder && asrAvailable && (
+        {showRecorder && streamingAvailable && (
           <VoiceRecorder
+            onInterimText={(text, _definite) => onInputChange(text)}
             onTranscribed={(text) => {
               onInputChange(text)
               setShowRecorder(false)
-              onSend()
+            }}
+            onError={(err) => {
+              console.warn("ASR error:", err)
+              setShowRecorder(false)
             }}
           />
         )}
@@ -116,6 +129,7 @@ export function ChatComposer({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={!canInput}
+          readOnly={showRecorder && streamingAvailable}
           title={disabledMessage || undefined}
           className={cn(
             "placeholder:text-muted-foreground/50 max-h-[200px] min-h-[64px] resize-none border-0 bg-transparent px-2 py-1 text-[15px] shadow-none transition-colors focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent",
@@ -139,7 +153,7 @@ export function ChatComposer({
             >
               <IconPhotoPlus className="size-4" />
             </Button>
-            {asrAvailable && (
+            {streamingAvailable ? (
               <Button
                 type="button"
                 variant="ghost"
@@ -147,12 +161,11 @@ export function ChatComposer({
                 className={`text-muted-foreground hover:text-foreground h-8 w-8 rounded-full ${showRecorder ? "bg-violet-100 text-violet-600" : ""}`}
                 onClick={() => setShowRecorder((v) => !v)}
                 disabled={!canInput}
-                title={showRecorder ? "关闭语音输入" : "语音输入"}
-                aria-label={showRecorder ? "关闭语音输入" : "语音输入"}
+                title={showRecorder ? "停止录音" : "语音输入"}
               >
                 <span className="text-base">{showRecorder ? "🎙️" : "🎤"}</span>
               </Button>
-            )}
+            ) : null}
             {ttsAvailable && (
               <Button
                 type="button"
@@ -184,7 +197,7 @@ export function ChatComposer({
                       type="button"
                       size="icon"
                       className="size-8 rounded-full bg-violet-500 text-white transition-transform hover:bg-violet-600 active:scale-95"
-                      onClick={onSend}
+                      onClick={handleSend}
                       disabled={!canSend}
                       aria-label={t("chat.sendMessage")}
                     >
