@@ -192,13 +192,13 @@ type volcengineStreamingSession struct {
 func newVolcengineSession(ctx context.Context, modelCfg *config.ModelConfig) (*volcengineStreamingSession, error) {
 	dialer := websocket.DefaultDialer
 	headers := http.Header{}
-	headers.Set("X-Api-App-Key", modelCfg.AppKey)
-	headers.Set("X-Api-Access-Key", modelCfg.AccessKey)
+	headers.Set("X-Api-App-Key", modelCfg.APIKey())
 	if modelCfg.ResourceID == "" {
 		modelCfg.ResourceID = "volc.bigasr.sauc.duration"
 	}
 	headers.Set("X-Api-Resource-Id", modelCfg.ResourceID)
 	headers.Set("X-Api-Request-Id", newUUID())
+	headers.Set("X-Api-Sequence", "-1")
 
 	conn, _, err := dialer.DialContext(ctx, modelCfg.APIBase, headers)
 	if err != nil {
@@ -368,7 +368,7 @@ func volcengineErrorMessage(code int, msg string) string {
 	case 45000001:
 		return "ASR 参数配置错误，请检查 app_id"
 	case 40200002:
-		return "ASR 鉴权失败，请检查 App Key / Access Key"
+		return "ASR 鉴权失败，请检查 App Key"
 	case 40200010:
 		return "ASR 时长配额已用尽，请充值或申请更多配额"
 	case 40200011:

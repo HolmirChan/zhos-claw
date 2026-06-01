@@ -23,11 +23,11 @@ Web 前端语音输入支持实时流式识别（边说边出字），替换当�
   │                                              │                                  │
   │                                              │── wss://openspeech.bytedance.com─▶│
   │                                              │   /api/v3/sauc/bigmodel           │
-  │                                              │   Headers (v3 仅走 X-Api-*):      │
-  │                                              │     X-Api-App-Key: {app_key}      │
-  │                                              │     X-Api-Access-Key: {access_key}│
-  │                                              │     X-Api-Resource-Id: {...}      │
-  │                                              │     X-Api-Request-Id: {uuid}      │
+  │                                              │   Headers:                        │
+  │                                              │     X-Api-App-Key: {api_key}     │
+  │                                              │     X-Api-Resource-Id: {res_id}  │
+  │                                              │     X-Api-Request-Id: {uuid}     │
+  │                                              │     X-Api-Sequence: -1           │
   │                                              │   火山 binary protocol             │
   │◀── {"type":"partial","text":"今天", ──────── │◀── utterances[0](definite=false) ───│
   │     "definite":false}                        │     utterances[1](definite=false)    │
@@ -93,12 +93,18 @@ type StreamingResult struct {
 | 参数 | 值 | 说明 |
 |------|-----|------|
 | URL | `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel` | v3 SAUC 大模型端点 |
-| X-Api-App-Key | `{app_key}` | 火山控制台 → 语音技术 → 应用列表 → App Key |
-| X-Api-Access-Key | `{access_key}` | 火山控制台 → 语音技术 → 应用列表 → Access Key |
-| X-Api-Resource-Id | `volc.bigasr.sauc.duration` | 时长计费资源 ID（默认值） |
-| X-Api-Request-Id | `{uuid}` | 每次连接唯一 UUID |
+| X-Api-App-Key | `{api_key}` | 火山控制台 APP Key，取自 `api_keys[0]` |
+| X-Api-Resource-Id | `{resource_id}` | 资源 ID，见下表 |
+| X-Api-Request-Id | `{uuid}` | 任务追踪，每次连接随机 UUID |
+| X-Api-Sequence | `-1` | 固定值 |
 
-> **鉴权说明**：v3 SAUC 端点仅走 `X-Api-App-Key` + `X-Api-Access-Key` 头部鉴权，不需要 `Authorization: Bearer;{token}`（那是 v1/v2 端点的方式）。两者二选一，v3 用 X-Api-* 头。
+> **Resource ID 取值**（控制台开通时分配）：
+> - 豆包流式语音识别模型 1.0 小时版：`volc.bigasr.sauc.duration`
+> - 豆包流式语音识别模型 1.0 并发版：`volc.bigasr.sauc.concurrent`
+> - 豆包流式语音识别模型 2.0 小时版：`volc.seedasr.sauc.duration`
+> - 豆包流式语音识别模型 2.0 并发版：`volc.seedasr.sauc.concurrent`
+>
+> 鉴权参考：[豆包语音 WebSocket 接口文档](https://www.volcengine.com/docs/6561/1354869)
 
 #### 2.2 Binary 协议 Header 布局（4 字节，大端序）
 
@@ -271,13 +277,11 @@ ModelConfig 新增字段（仅 volcengine-asr 条目需要）：
 ```go
 type ModelConfig struct {
     // ...existing fields...
-    AppKey     string `json:"app_key,omitempty"`     // → X-Api-App-Key。TODO: 后续迁移为 SecureString 类型（支持 plaintext/file:///enc://），与 ModelConfig.APIKey 风格统一
-    AccessKey  string `json:"access_key,omitempty"`   // → X-Api-Access-Key。TODO: 同上
     ResourceID string `json:"resource_id,omitempty"`  // → X-Api-Resource-Id，默认 "volc.bigasr.sauc.duration"
 }
 ```
 
-> 凭证字段精简说明：火山 v3 SAUC 实际只需 `app_id`（已有）、`app_key`、`access_key` 三个值。`app_id` 即火山应用 ID（填入 payload `app.appid`），`app_key` 和 `access_key` 在火山控制台「语音技术→应用列表→应用详情」中可找到。
+> 凭证说明：火山 v3 SAUC 使用 `api_keys[0]` → `X-Api-App-Key` 鉴权，`api_keys` 为项目已有的 SecureStrings 类型（支持 plaintext/file:///enc://）。`app_id` 即火山应用 ID（填入 payload `app.appid`），`resource_id` 对应控制台开通的资源 ID。
 
 ### 5. `web/backend/api/voice.go` — 新增 WebSocket handler
 
@@ -386,9 +390,8 @@ interface VoiceRecorderProps {
       "model_name": "volcengine-asr",
       "provider": "volcengine-asr",
       "api_base": "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel",
+      "api_keys": ["your_app_key"],
       "app_id": "your_app_id",
-      "app_key": "your_app_key",
-      "access_key": "your_access_key",
       "resource_id": "volc.bigasr.sauc.duration"
     }
   ],
@@ -401,10 +404,9 @@ interface VoiceRecorderProps {
 ```
 
 > **凭证字段映射到火山控制台：**
-> - `app_id`：控制台 → 语音技术 → 应用列表 → **APP ID**
-> - `app_key`：控制台 → 语音技术 → 应用列表 → 应用详情 → **App Key**（→ HTTP 头 `X-Api-App-Key`）
-> - `access_key`：控制台 → 语音技术 → 应用列表 → 应用详情 → **Access Key**（→ HTTP 头 `X-Api-Access-Key`）
-> - `resource_id`：固定 `"volc.bigasr.sauc.duration"`（时长计费资源标识）
+> - `api_keys[0]`：控制台 → 语音技术 → 应用列表 → 应用详情 → **App Key**（→ HTTP 头 `X-Api-App-Key`）
+> - `app_id`：控制台 → 语音技术 → 应用列表 → 应用详情 → **APP ID**（→ payload `app.appid`）
+> - `resource_id`：控制台开通的资源 ID，如 `volc.bigasr.sauc.duration`（→ HTTP 头 `X-Api-Resource-Id`）
 
 ## 交互流程
 
@@ -424,7 +426,7 @@ interface VoiceRecorderProps {
 | 火山错误码 | 分类 | 前端 message |
 |-----------|------|-------------|
 | `45000001` | 配置错误（非重试） | "ASR 参数配置错误，请检查 app_id" |
-| `40200002` | 鉴权失败（非重试） | "ASR 鉴权失败，请检查 App Key / Access Key" |
+| `40200002` | 鉴权失败（非重试） | "ASR 鉴权失败，请检查 App Key" |
 | `40200010` | 配额超限 | "ASR 时长配额已用尽，请充值或申请更多配额" |
 | `40200011` | QPS 超限 | "ASR 请求过于频繁，请稍后重试" |
 | `45000081` | 超时 | "ASR 请求超时，请重试" |

@@ -740,10 +740,8 @@ type ModelConfig struct {
 	ExtraBody           map[string]any       `json:"extra_body,omitempty"`            // Additional fields to inject into request body
 	CustomHeaders       map[string]string    `json:"custom_headers,omitempty"`        // Additional headers to inject into every HTTP request
 
-	// Volcengine ASR streaming credentials (TODO: migrate to SecureString)
+	// Volcengine ASR streaming: api_keys[0] -> X-Api-App-Key
 	AppID      string `json:"app_id,omitempty"`      // 火山应用 ID -> payload app.appid
-	AppKey     string `json:"app_key,omitempty"`      // -> X-Api-App-Key
-	AccessKey  string `json:"access_key,omitempty"`   // -> X-Api-Access-Key
 	ResourceID string `json:"resource_id,omitempty"`  // -> X-Api-Resource-Id，默认 "volc.bigasr.sauc.duration"
 
 	APIKeys SecureStrings `json:"api_keys,omitzero" yaml:"api_keys,omitempty"` // API authentication keys (multiple keys for failover)
