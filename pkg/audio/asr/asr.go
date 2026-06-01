@@ -141,3 +141,28 @@ func DetectTranscriber(cfg *config.Config) Transcriber {
 	}
 	return nil
 }
+
+// DetectStreamingTranscriber inspects cfg and returns a StreamingTranscriber.
+// Returns (nil, nil) when streaming_model_name is empty or no matching provider is found.
+func DetectStreamingTranscriber(cfg *config.Config) (StreamingTranscriber, error) {
+	if cfg == nil {
+		return nil, nil
+	}
+
+	modelName := strings.TrimSpace(cfg.Voice.StreamingModelName)
+	if modelName == "" {
+		return nil, nil
+	}
+
+	modelCfg, err := cfg.GetModelConfig(modelName)
+	if err != nil {
+		return nil, nil
+	}
+
+	protocol, _ := providers.ExtractProtocol(modelCfg)
+	if protocol == "volcengine-asr" {
+		return &volcengineStreamingTranscriber{modelCfg: modelCfg}, nil
+	}
+
+	return nil, nil
+}

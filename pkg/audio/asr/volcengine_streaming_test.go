@@ -1,6 +1,12 @@
 package asr
 
-import "testing"
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/sipeed/picoclaw/pkg/config"
+)
 
 func TestVolcengineHeaderEncode(t *testing.T) {
 	tests := []struct {
@@ -163,5 +169,135 @@ func TestIsServerACK(t *testing.T) {
 	msgType, _, _, _ := decodeVolcengineHeader(header)
 	if msgType != volcengineMsgServerACK {
 		t.Error("should be Server ACK")
+	}
+}
+
+func TestUtteranceDedup(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	s := &volcengineStreamingSession{
+		results: make(chan StreamingResult, 64),
+		ctx:     ctx,
+	}
+
+	// Frame 1: new utterance
+	s.dedupAndPush([]StreamingResult{{Text: "今天", Definite: false}})
+	if len(s.lastUtterances) != 1 || s.lastUtterances[0].Text != "今天" {
+		t.Error("frame 1: should cache new utterance")
+	}
+	r1 := readResult(s.results)
+	if r1.Text != "今天" {
+		t.Errorf("frame 1 result = %+v", r1)
+	}
+
+	// Frame 2: same index text change
+	s.dedupAndPush([]StreamingResult{{Text: "今天天气", Definite: false}})
+	r2 := readResult(s.results)
+	if r2.Text != "今天天气" {
+		t.Errorf("frame 2: should push text change, got %+v", r2)
+	}
+
+	// Frame 3: definite false->true + new utterance
+	s.dedupAndPush([]StreamingResult{
+		{Text: "今天天气", Definite: true},
+		{Text: "怎么样", Definite: false},
+	})
+	results3 := drainResults(s.results, 2)
+	if len(results3) != 2 {
+		t.Fatalf("frame 3: expected 2 results, got %d", len(results3))
+	}
+	if results3[0].Text != "今天天气" || results3[0].Definite != true {
+		t.Errorf("frame 3[0] = %+v", results3[0])
+	}
+	if results3[1].Text != "怎么样" || results3[1].Definite != false {
+		t.Errorf("frame 3[1] = %+v", results3[1])
+	}
+
+	// Frame 4: no change -> skip
+	s.dedupAndPush([]StreamingResult{
+		{Text: "今天天气", Definite: true},
+		{Text: "怎么样", Definite: false},
+	})
+	select {
+	case r := <-s.results:
+		t.Errorf("frame 4: should be no push, got %+v", r)
+	default:
+	}
+
+	// Frame 5: definite true->false (safety skip, should not happen)
+	s.dedupAndPush([]StreamingResult{{Text: "今天天气", Definite: false}})
+	select {
+	case r := <-s.results:
+		t.Errorf("frame 5: true->false should be skipped, got %+v", r)
+	default:
+	}
+}
+
+func readResult(ch <-chan StreamingResult) StreamingResult {
+	select {
+	case r := <-ch:
+		return r
+	case <-time.After(time.Second):
+		return StreamingResult{Error: "timeout"}
+	}
+}
+
+func drainResults(ch <-chan StreamingResult, n int) []StreamingResult {
+	var results []StreamingResult
+	for i := 0; i < n; i++ {
+		select {
+		case r := <-ch:
+			results = append(results, r)
+		case <-time.After(time.Second):
+			return results
+		}
+	}
+	return results
+}
+
+func TestDetectStreamingTranscriber(t *testing.T) {
+	// Case 1: empty streaming_model_name
+	cfg := &config.Config{}
+	tr, err := DetectStreamingTranscriber(cfg)
+	if err != nil {
+		t.Errorf("empty name: unexpected error: %v", err)
+	}
+	if tr != nil {
+		t.Error("empty name: should return nil")
+	}
+
+	// Case 2: streaming_model_name set but model not in model_list -> (nil, nil)
+	cfg2 := &config.Config{
+		Voice: config.VoiceConfig{StreamingModelName: "nonexistent"},
+	}
+	tr2, err2 := DetectStreamingTranscriber(cfg2)
+	if err2 != nil {
+		t.Errorf("nonexistent model: unexpected error: %v", err2)
+	}
+	if tr2 != nil {
+		t.Error("nonexistent model: should return nil transcriber")
+	}
+
+	// Case 3: matching volcengine-asr protocol
+	cfg3 := &config.Config{
+		Voice: config.VoiceConfig{StreamingModelName: "volcengine-asr"},
+		ModelList: config.SecureModelList{
+			{
+				ModelName: "volcengine-asr",
+				Provider:  "volcengine-asr",
+				Model:     "bigmodel",
+				APIBase:   "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel",
+			},
+		},
+	}
+	tr3, err3 := DetectStreamingTranscriber(cfg3)
+	if err3 != nil {
+		t.Errorf("volcengine-asr: unexpected error: %v", err3)
+	}
+	if tr3 == nil {
+		t.Error("volcengine-asr: should return transcriber")
+	}
+	if tr3.Name() != "volcengine-asr" {
+		t.Errorf("name = %s, want volcengine-asr", tr3.Name())
 	}
 }
