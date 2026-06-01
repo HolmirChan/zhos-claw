@@ -1,100 +1,134 @@
-import { useState, useRef, useCallback } from "react";
-import { transcribeAudio } from "@/api/voice";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 interface VoiceRecorderProps {
+  onInterimText: (text: string, definite: boolean) => void;
   onTranscribed: (text: string) => void;
+  onError?: (error: string) => void;
 }
 
-export function VoiceRecorder({ onTranscribed }: VoiceRecorderProps) {
-  const [recording, setRecording] = useState(false);
-  const [loading, setLoading] = useState(false);
+export function VoiceRecorder({ onInterimText, onTranscribed, onError }: VoiceRecorderProps) {
   const [elapsed, setElapsed] = useState(0);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const [loading, setLoading] = useState(true);
+  const wsRef = useRef<WebSocket | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const workletRef = useRef<AudioWorkletNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+  const lockedTextRef = useRef("");
+  const currentTextRef = useRef("");
 
-  const isSupported = typeof MediaRecorder !== "undefined";
+  const isSupported = typeof AudioContext !== "undefined" && typeof WebSocket !== "undefined";
+
+  const cleanup = useCallback(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (autoStopRef.current) { clearTimeout(autoStopRef.current); autoStopRef.current = null; }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    workletRef.current?.port.close();
+    audioCtxRef.current?.close();
+    wsRef.current?.close();
+    wsRef.current = null;
+    audioCtxRef.current = null;
+    workletRef.current = null;
+    streamRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    startRecording();
+    return () => {
+      mountedRef.current = false;
+      cleanup();
+    };
+  }, []);
 
   const startRecording = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Safari doesn't support audio/webm, fall back to audio/mp4
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm")
-        ? "audio/webm"
-        : "audio/mp4";
-      const blobType = mimeType;
-      const recorder = new MediaRecorder(stream, { mimeType });
-      mediaRecorderRef.current = recorder;
-      chunksRef.current = [];
+      lockedTextRef.current = "";
+      currentTextRef.current = "";
+      const audioCtx = new AudioContext({ sampleRate: 16000 });
+      audioCtxRef.current = audioCtx;
 
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
+      await audioCtx.audioWorklet.addModule("/voice-processor.js");
 
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        setLoading(true);
-        try {
-          const blob = new Blob(chunksRef.current, { type: blobType });
-          const result = await transcribeAudio(blob);
-          if (result.text) {
-            onTranscribed(result.text);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { sampleRate: { ideal: 16000 }, channelCount: 1 },
+      });
+      streamRef.current = stream;
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      const workletNode = new AudioWorkletNode(audioCtx, "voice-processor");
+      workletRef.current = workletNode;
+      source.connect(workletNode);
+
+      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${protocol}//${location.host}/api/voice/stream`);
+      ws.binaryType = "arraybuffer";
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setLoading(false);
+        workletNode.port.onmessage = (e: MessageEvent) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(e.data);
           }
-        } finally {
-          setLoading(false);
-          setRecording(false);
-          setElapsed(0);
-        }
+        };
       };
 
-      recorder.start();
-      setRecording(true);
+      ws.onmessage = (e) => {
+        if (!mountedRef.current) return;
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === "partial") {
+            if (msg.definite) {
+              lockedTextRef.current += msg.text;
+              currentTextRef.current = "";
+            } else {
+              currentTextRef.current = msg.text;
+            }
+            onInterimText(lockedTextRef.current + currentTextRef.current, msg.definite);
+          } else if (msg.type === "final") {
+            onTranscribed(msg.text);
+          } else if (msg.type === "error") {
+            onError?.(msg.message);
+          }
+        } catch {}
+      };
+
+      ws.onerror = () => onError?.("WebSocket 连接失败");
+
       setElapsed(0);
       timerRef.current = setInterval(() => {
         setElapsed((prev) => {
           if (prev >= 59) {
-            recorder.stop();
-            if (timerRef.current) clearInterval(timerRef.current);
+            cleanup();
             return prev;
           }
           return prev + 1;
         });
       }, 1000);
 
-      // Auto-stop at 60 seconds
-      const timeoutId = setTimeout(() => {
-        if (recorder.state === "recording") {
-          recorder.stop();
-          if (timerRef.current) clearInterval(timerRef.current);
+      autoStopRef.current = setTimeout(() => {
+        if (mountedRef.current) {
+          cleanup();
         }
       }, 60_000);
-      // Clear timeout on normal stop
-      const origOnStop = recorder.onstop;
-      recorder.onstop = (e) => {
-        clearTimeout(timeoutId);
-        origOnStop?.call(recorder, e);
-      };
     } catch {
-      // User denied microphone permission
+      setLoading(false);
     }
-  }, [onTranscribed]);
-
-  const stopRecording = useCallback(() => {
-    mediaRecorderRef.current?.stop();
-    if (timerRef.current) clearInterval(timerRef.current);
-  }, []);
+  }, [onInterimText, onTranscribed, onError, cleanup]);
 
   if (!isSupported) return null;
 
   return (
     <button
       type="button"
-      onClick={recording ? stopRecording : startRecording}
-      disabled={loading}
-      className={`voice-mic-btn ${recording ? "recording" : ""} ${loading ? "loading" : ""}`}
-      title={recording ? "停止录音" : "语音输入"}
+      disabled
+      className="voice-mic-btn recording"
+      title="录音中"
     >
-      {loading ? "..." : recording ? `${elapsed}s` : "🎤"}
+      {loading ? "..." : `${elapsed}s`}
     </button>
   );
 }
