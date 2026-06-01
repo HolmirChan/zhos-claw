@@ -52,7 +52,7 @@ func decodeVolcengineHeader(h [4]byte) (msgType, flags, serialization, compressi
 	return
 }
 
-func buildFullClientRequestPayload(uid string) map[string]any {
+func buildFullClientRequestPayload(uid, modelName string) map[string]any {
 	return map[string]any{
 		"user": map[string]string{"uid": uid},
 		"audio": map[string]any{
@@ -63,7 +63,7 @@ func buildFullClientRequestPayload(uid string) map[string]any {
 			"language": "zh-CN",
 		},
 		"request": map[string]any{
-			"model_name":     "bigmodel",
+			"model_name":     modelName,
 			"enable_itn":     true,
 			"enable_punc":    true,
 			"show_utterances": true,
@@ -71,8 +71,8 @@ func buildFullClientRequestPayload(uid string) map[string]any {
 	}
 }
 
-func buildFullClientFrame(uid string) ([]byte, error) {
-	payloadJSON, err := json.Marshal(buildFullClientRequestPayload(uid))
+func buildFullClientFrame(uid, modelName string) ([]byte, error) {
+	payloadJSON, err := json.Marshal(buildFullClientRequestPayload(uid, modelName))
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +215,7 @@ func newVolcengineSession(ctx context.Context, modelCfg *config.ModelConfig) (*v
 		cancel:  cancel,
 	}
 
-	frame, err := buildFullClientFrame("web-user")
+	frame, err := buildFullClientFrame("web-user", modelCfg.Model)
 	if err != nil {
 		conn.Close()
 		cancel()

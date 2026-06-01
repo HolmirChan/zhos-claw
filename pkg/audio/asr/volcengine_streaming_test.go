@@ -87,7 +87,7 @@ func TestVolcengineHeaderDecode(t *testing.T) {
 }
 
 func TestBuildFullClientRequestPayload(t *testing.T) {
-	payload := buildFullClientRequestPayload("test-uid")
+	payload := buildFullClientRequestPayload("test-uid", "bigmodel")
 	if payload["app"] != nil {
 		t.Error("no app field expected in v3 payload")
 	}
