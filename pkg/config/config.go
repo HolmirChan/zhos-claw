@@ -694,8 +694,9 @@ type VoiceConfig struct {
 	TTSModelName      string `json:"tts_model_name,omitempty"     env:"PICOCLAW_VOICE_TTS_MODEL_NAME"`
 	TTSFormat         string `json:"tts_format,omitempty"         env:"PICOCLAW_VOICE_TTS_FORMAT"`
 	TTSVoice          string `json:"tts_voice,omitempty"          env:"PICOCLAW_VOICE_TTS_VOICE"`
-	EchoTranscription bool   `json:"echo_transcription"           env:"PICOCLAW_VOICE_ECHO_TRANSCRIPTION"`
-	ElevenLabsAPIKey  string `json:"elevenlabs_api_key,omitempty" env:"PICOCLAW_VOICE_ELEVENLABS_API_KEY"`
+	EchoTranscription  bool   `json:"echo_transcription"            env:"PICOCLAW_VOICE_ECHO_TRANSCRIPTION"`
+	ElevenLabsAPIKey   string `json:"elevenlabs_api_key,omitempty"  env:"PICOCLAW_VOICE_ELEVENLABS_API_KEY"`
+	StreamingModelName string `json:"streaming_model_name,omitempty" env:"PICOCLAW_VOICE_STREAMING_MODEL_NAME"`
 }
 
 type ModelStreamingConfig struct {
@@ -738,6 +739,12 @@ type ModelConfig struct {
 	Streaming           ModelStreamingConfig `json:"streaming,omitzero"`              // Opt-in for provider streaming on this model entry
 	ExtraBody           map[string]any       `json:"extra_body,omitempty"`            // Additional fields to inject into request body
 	CustomHeaders       map[string]string    `json:"custom_headers,omitempty"`        // Additional headers to inject into every HTTP request
+
+	// Volcengine ASR streaming credentials (TODO: migrate to SecureString)
+	AppID      string `json:"app_id,omitempty"`      // 火山应用 ID -> payload app.appid
+	AppKey     string `json:"app_key,omitempty"`      // -> X-Api-App-Key
+	AccessKey  string `json:"access_key,omitempty"`   // -> X-Api-Access-Key
+	ResourceID string `json:"resource_id,omitempty"`  // -> X-Api-Resource-Id，默认 "volc.bigasr.sauc.duration"
 
 	APIKeys SecureStrings `json:"api_keys,omitzero" yaml:"api_keys,omitempty"` // API authentication keys (multiple keys for failover)
 
