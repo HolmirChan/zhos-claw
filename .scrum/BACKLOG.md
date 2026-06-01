@@ -1,20 +1,33 @@
 # Backlog
 
-> 当前迭代: sprint_005
+> 当前迭代: sprint_006
 
 ## 待规划
+
+### BL-009 · 流式语音识别 + 播放交互优化
+- **意图**: ASR 从「录完上传→一次性返回」升级为实时流式识别（边说边出字），对接火山引擎 WebSocket 协议；TTS 播放按钮从气泡底部行内移到右上角与复制按钮并排
+- **方案方向**: 后端新增 `pkg/audio/asr/streaming.go` 流式接口 + 火山引擎 WebSocket 实现 + `GET /api/voice/stream` WebSocket 端点；前端 VoiceRecorder 改用 AudioContext 采集 PCM、WebSocket 推送音频块、流式更新输入框；AudioPlayer 移入 assistant-message 右上角
+- **设计文档**: .scrum/specs/2026-06-01-streaming-asr-design.md
+- **实现计划**: .scrum/plans/2026-06-01-streaming-asr.md
+- **验收标准**:
+  - [ ] 点🎤立即录音，按钮脉冲动画 + 计时，说话时输入框实时出字
+  - [ ] 点发送/Enter 停止录音并发送；再点🎤停止录音文字留输入框
+  - [ ] 60s 自动停止
+  - [ ] HTTP `/api/voice/transcribe`（SiliconFlow）并行可用
+  - [ ] TTS 播放按钮在消息气泡右上角，与复制按钮并排
+
+## 已交付
 
 ### BL-008 · 语音交互支持
 - **意图**: Agent 支持语音输入（STT）和语音输出（TTS），Web UI 和 CLI 均可使用
 - **方案方向**: 接入语音识别/合成 API（如 OpenAI Whisper/TTS、Azure Speech），Web 前端增加录音按钮和音频播放组件；pkg/providers 新增 speech provider 抽象
 - **设计文档**: .scrum/specs/2026-05-28-web-voice-support-design.md
 - **实现计划**: .scrum/plans/2026-05-28-web-voice-support.md
+- **已完成于**: sprint_005.md
 - **验收标准**:
-  - [ ] Web 对话页支持语音输入（点击录音 → STT → 填入输入框）
-  - [ ] Agent 回复支持语音朗读（TTS → 音频播放）
-  - [ ] 语音识别支持中文
-
-## 已交付
+  - [x] Web 对话页支持语音输入（点击录音 → STT → 填入输入框）
+  - [x] Agent 回复支持语音朗读（TTS → 音频播放）
+  - [x] 语音识别支持中文
 
 ### BL-007 · RK3588 一键部署
 - **意图**: 一条命令完成构建→推送→初始化→启动，解决设备无 /etc/hosts、无 CA 证书、toybox 环境等兼容性问题
