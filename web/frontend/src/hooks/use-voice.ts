@@ -6,6 +6,7 @@ import {
   voiceOutputAtom,
   voiceAsrAvailableAtom,
   voiceTtsAvailableAtom,
+  streamingAvailableAtom,
 } from "@/store/voice";
 
 export function useVoice() {
@@ -13,16 +14,18 @@ export function useVoice() {
   const [outputEnabled, setOutputEnabled] = useAtom(voiceOutputAtom);
   const [asrAvailable, setAsrAvailable] = useAtom(voiceAsrAvailableAtom);
   const [ttsAvailable, setTtsAvailable] = useAtom(voiceTtsAvailableAtom);
+  const [streamingAvailable, setStreamingAvailable] = useAtom(streamingAvailableAtom);
 
   useEffect(() => {
     fetchVoiceCapabilities().then((caps) => {
       setAsrAvailable(caps.asr);
       setTtsAvailable(caps.tts);
+      setStreamingAvailable(caps.streaming);
     }).catch(() => {});
   }, []);
 
   const toggleInput = useCallback(() => setInputEnabled((v) => !v), []);
   const toggleOutput = useCallback(() => setOutputEnabled((v) => !v), []);
 
-  return { inputEnabled, outputEnabled, asrAvailable, ttsAvailable, toggleInput, toggleOutput };
+  return { inputEnabled, outputEnabled, asrAvailable, ttsAvailable, streamingAvailable, toggleInput, toggleOutput };
 }

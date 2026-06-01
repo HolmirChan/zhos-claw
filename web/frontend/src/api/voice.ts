@@ -3,6 +3,7 @@ import { launcherFetch } from "@/api/http"
 export async function fetchVoiceCapabilities(): Promise<{
   asr: boolean
   tts: boolean
+  streaming: boolean
 }> {
   const res = await launcherFetch("/api/voice/capabilities")
   return res.json()
