@@ -250,31 +250,31 @@ export function AssistantMessage({
           )}
 
           {!isCollapsedBlock && hasText && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "bg-background/50 hover:bg-background/80 absolute top-2 right-2 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100",
-              )}
-              onClick={() => void copy(content)}
-              aria-label={copyMessageLabel}
-              title={copyMessageLabel}
-            >
-              {isCopied ? (
-                <IconCheck className="h-4 w-4 text-green-500" />
-              ) : (
-                <IconCopy className="text-muted-foreground h-4 w-4" />
-              )}
-            </Button>
-          )}
-          {ttsLoading && (
-            <div className="text-muted-foreground/60 border-t border-border/30 px-4 py-2 text-xs">
-              <span className="inline-block animate-pulse">🔈 正在生成语音...</span>
-            </div>
-          )}
-          {audioUrl && (
-            <div className="border-t border-border/30 px-4 py-2">
-              <AudioPlayer audioUrl={audioUrl} />
+            <div className="absolute top-2 right-2 flex items-center gap-1">
+              {/* AudioPlayer: mutual exclusion — either loading spinner OR play button, always visible */}
+              {ttsLoading ? (
+                <AudioPlayer />
+              ) : audioUrl ? (
+                <AudioPlayer audioUrl={audioUrl} />
+              ) : null}
+
+              {/* Copy button: hover-only */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "bg-background/50 hover:bg-background/80 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100",
+                )}
+                onClick={() => void copy(content)}
+                aria-label={copyMessageLabel}
+                title={copyMessageLabel}
+              >
+                {isCopied ? (
+                  <IconCheck className="h-4 w-4 text-green-500" />
+                ) : (
+                  <IconCopy className="text-muted-foreground h-4 w-4" />
+                )}
+              </Button>
             </div>
           )}
         </div>
