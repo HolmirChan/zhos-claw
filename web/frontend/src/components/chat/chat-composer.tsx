@@ -54,7 +54,7 @@ export function ChatComposer({
   contextUsage,
 }: ChatComposerProps) {
   const { t } = useTranslation()
-  const { outputEnabled, asrAvailable, ttsAvailable, streamingAvailable, toggleOutput } = useVoice()
+  const { outputEnabled, ttsAvailable, streamingAvailable, toggleOutput } = useVoice()
   const [showRecorder, setShowRecorder] = useState(false)
   const canInput = inputDisabledReason === null
   const disabledMessage =
