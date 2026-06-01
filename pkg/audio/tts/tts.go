@@ -32,6 +32,8 @@ func providerFromModelConfig(mc *config.ModelConfig, format string, voice string
 	switch protocol {
 	case "mimo":
 		return NewMimoTTSProvider(mc.APIKey(), providers.ResolveAPIBase(mc), modelID, mc.Proxy)
+	case "volcengine-tts":
+		return NewVolcengineTTSProvider(mc, format, voice)
 	default:
 		return NewOpenAITTSProvider(mc.APIKey(), providers.ResolveAPIBase(mc), mc.Proxy, modelID, format, voice)
 	}

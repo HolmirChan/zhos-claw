@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/sipeed/picoclaw/pkg/config"
@@ -97,13 +98,13 @@ func buildFullClientFrame(uid, modelName string) ([]byte, error) {
 // encodeAudioOnlyFrame returns header, seqBytes (4B, only when !isLast), payloadSize (4B), payload.
 // Regular frame: [4B header][4B seq][4B payload_size][payload]
 // Last frame (flags=0b0010): [4B header][4B payload_size][payload] — no seq
-// Compression=0b0000 (no gzip for PCM).
+// Audio frames use gzip compression per volcengine spec.
 func encodeAudioOnlyFrame(audioData []byte, seq int32, isLast bool) (header [4]byte, seqBytes []byte, payloadSize []byte, payload []byte) {
 	flags := byte(volcengineFlagPosSequence)
 	if isLast {
 		flags = volcengineFlagLastNoSeq
 	}
-	header = encodeVolcengineHeader(volcengineMsgAudioOnlyReq, flags, volcengineSerialRaw, volcengineCompressNone)
+	header = encodeVolcengineHeader(volcengineMsgAudioOnlyReq, flags, volcengineSerialRaw, volcengineCompressGzip)
 	if !isLast {
 		seqBytes = make([]byte, 4)
 		binary.BigEndian.PutUint32(seqBytes, uint32(seq))
@@ -118,26 +119,34 @@ type rawUtterance struct {
 	Definite bool   `json:"definite"`
 }
 
-type rawServerResponse struct {
+	type rawServerResponse struct {
 	Result struct {
+		Text       string         `json:"text"`
 		Utterances []rawUtterance `json:"utterances"`
 	} `json:"result"`
-}
-
-func parseUtterances(jsonBody []byte) []StreamingResult {
+	}
+	
+	func parseUtterances(jsonBody []byte) []StreamingResult {
 	var resp rawServerResponse
 	if err := json.Unmarshal(jsonBody, &resp); err != nil {
 		return []StreamingResult{{Error: fmt.Sprintf("parse error: %v", err)}}
 	}
-	results := make([]StreamingResult, 0, len(resp.Result.Utterances))
-	for _, u := range resp.Result.Utterances {
-		results = append(results, StreamingResult{
-			Text:     u.Text,
-			Definite: u.Definite,
-		})
+	if len(resp.Result.Utterances) > 0 {
+		results := make([]StreamingResult, 0, len(resp.Result.Utterances))
+		for _, u := range resp.Result.Utterances {
+			results = append(results, StreamingResult{
+				Text:     u.Text,
+				Definite: u.Definite,
+			})
+		}
+		return results
 	}
-	return results
-}
+	// Fallback: no utterances, use result.text as a single interim result
+	if resp.Result.Text != "" {
+		return []StreamingResult{{Text: resp.Result.Text, Definite: false}}
+	}
+	return nil
+	}
 
 type rawErrorResponse struct {
 	Code    int    `json:"code"`
@@ -213,6 +222,7 @@ func newVolcengineSession(ctx context.Context, modelCfg *config.ModelConfig) (*v
 		results: make(chan StreamingResult, 64),
 		ctx:     ctx,
 		cancel:  cancel,
+		seq:     1, // Full Client Request = seq 1, first audio = seq 2
 	}
 
 	frame, err := buildFullClientFrame("web-user", modelCfg.Model)
@@ -237,12 +247,20 @@ func (s *volcengineStreamingSession) SendAudio(chunk []byte) error {
 	seq := s.seq
 	s.mu.Unlock()
 
-	header, seqBytes, payloadSize, payload := encodeAudioOnlyFrame(chunk, seq, false)
-	frame := make([]byte, 0, 4+4+4+len(payload))
+	// Gzip compress audio data per volcengine spec
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	if _, err := gw.Write(chunk); err != nil {
+		return err
+	}
+	gw.Close()
+
+	header, seqBytes, payloadSize, _ := encodeAudioOnlyFrame(buf.Bytes(), seq, false)
+	frame := make([]byte, 0, 4+4+4+buf.Len())
 	frame = append(frame, header[:]...)
 	frame = append(frame, seqBytes...)
 	frame = append(frame, payloadSize...)
-	frame = append(frame, payload...)
+	frame = append(frame, buf.Bytes()...)
 	return s.conn.WriteMessage(websocket.BinaryMessage, frame)
 }
 
@@ -252,14 +270,16 @@ func (s *volcengineStreamingSession) Results() <-chan StreamingResult {
 
 func (s *volcengineStreamingSession) Close() error {
 	s.closeOnce.Do(func() {
-		// Last frame: flags=0b0010, no seq, empty payload
-		header := encodeVolcengineHeader(volcengineMsgAudioOnlyReq, volcengineFlagLastNoSeq, volcengineSerialRaw, volcengineCompressNone)
-		payloadSize := make([]byte, 4) // zero
+		var buf bytes.Buffer
+		gw := gzip.NewWriter(&buf)
+		gw.Close()
+		header := encodeVolcengineHeader(volcengineMsgAudioOnlyReq, volcengineFlagLastNoSeq, volcengineSerialRaw, volcengineCompressGzip)
+		payloadSize := make([]byte, 4)
+		binary.BigEndian.PutUint32(payloadSize, uint32(buf.Len()))
 		frame := append(header[:], payloadSize...)
+		frame = append(frame, buf.Bytes()...)
 		s.conn.WriteMessage(websocket.BinaryMessage, frame)
-
-		s.cancel()
-		s.conn.Close()
+		s.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	})
 	return nil
 }

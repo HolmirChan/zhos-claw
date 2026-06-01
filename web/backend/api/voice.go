@@ -277,8 +277,11 @@ func (h *Handler) handleVoiceStream(w http.ResponseWriter, r *http.Request) {
 		defer wg.Done()
 		defer session.Close()
 		for {
-			_, msg, err := conn.ReadMessage()
+			msgType, msg, err := conn.ReadMessage()
 			if err != nil {
+				return
+			}
+			if msgType == websocket.CloseMessage {
 				return
 			}
 			if err := session.SendAudio(msg); err != nil {

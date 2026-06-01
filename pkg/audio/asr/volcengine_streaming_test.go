@@ -110,8 +110,8 @@ func TestEncodeAudioOnlyFrame(t *testing.T) {
 	if flags != volcengineFlagPosSequence {
 		t.Errorf("flags = %04b, want %04b", flags, volcengineFlagPosSequence)
 	}
-	if comp != volcengineCompressNone {
-		t.Errorf("compression = %04b, want 0000", comp)
+	if comp != volcengineCompressGzip {
+		t.Errorf("compression = %04b, want gzip (0001)", comp)
 	}
 	if len(seqBytes) != 4 || len(payloadSize) != 4 {
 		t.Error("seqBytes or payloadSize missing")

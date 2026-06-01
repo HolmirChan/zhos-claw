@@ -1,7 +1,7 @@
 # Sprint 5
 
 > 创建: 2026-05-29
-> 完成: -
+> 完成: 2026-06-01
 > 目标版本: -
 > 来源: BACKLOG.md（BL-008）
 > 设计文档: .scrum/specs/2026-05-28-web-voice-support-design.md
@@ -85,7 +85,7 @@
   - [x] 提交（2 commits）
 - **阻塞**: -
 
-### SB-009 · 测试验收 [~]
+### SB-009 · 测试验收 [x]
 - **来源**: BL-008
 - **阻塞**: SB-001~SB-007 全部完成
 - **子任务**:
@@ -122,21 +122,21 @@
     - `POST /api/voice/synthesize` 合成语音：`curl -s -X POST http://localhost:18800/api/voice/synthesize -H "Content-Type: application/json" -d '{"text":"你好世界"}'` → 200 + JSON 含 `"audio_url": "/api/voice/audio/..."`
     - `GET /api/voice/audio/{file_id}` 播放音频：用上一步返回的 file_id → `curl -s -o /tmp/test-audio.ogg http://localhost:18800/api/voice/audio/{file_id}` → 200 + 文件大小 > 0 + `file /tmp/test-audio.ogg` 识别为 Ogg/MP3
 
-  - [ ] **Phase 6：前端功能验收**（用户浏览器操作，Claude 观察分析）
+  - [x] **Phase 6：前端功能验收**（用户浏览器操作，Claude 观察分析）
     - **能力探测 & 按钮显隐**：打开 http://localhost:18800 → 聊天页输入框左侧出现麦克风按钮和喇叭按钮（Provider 已配置时）
     - **语音输入流程**：点击麦克风 → 浏览器弹权限请求 → 允许 → 录音中显示秒数 → 再次点击或等 60s → 自动发送消息，输入框出现识别文字，Agent 正常回复
     - **语音输出流程**：点击喇叭开启（高亮态）→ 发一条文字消息 → Agent 回复后，气泡底部出现音频播放条 → 音频自动播放
     - **关闭语音输出**：点击喇叭关闭 → 发消息 → 不触发 TTS，气泡无播放条
     - **中文识别**：点麦克风 → 说一段中文（如"今天天气怎么样"）→ 停止 → 输入框出现正确的中文 → 发送后 Agent 正常回复
 
-  - [ ] **Phase 7：边界情况**（用户浏览器操作 + Claude curl 配合）
+  - [x] **Phase 7：边界情况**（用户浏览器操作 + Claude curl 配合）
     - **空语音**：不说话直接停止录音 → 前端应提示「未识别到语音」或静默不发送（不出现空白消息）
     - **TTS 失败降级**：Claude 删除 tts-cache 目录或制造权限问题 → 发消息并开启喇叭 → 消息正常显示文字，不因 TTS 失败而阻塞
     - **切换喇叭不触发历史消息**：关闭喇叭 → 发 3 条消息 → 开启喇叭 → 已有消息不追加音频，仅新消息触发
     - **Safari 兼容**（如有条件）：Safari 浏览器打开 → 录音正常 → 格式为 audio/mp4 → ASR 正常识别
     - **音频 404**：Claude 手动删除某条 TTS 缓存文件 → 用户点播放 → 不阻塞 UI，仅音频加载失败
 
-  - [ ] **Phase 8：回归检查**（用户浏览器操作）
+  - [x] **Phase 8：回归检查**（用户浏览器操作）
     - 文字输入 + Enter 发送正常
     - Shift+Enter 换行正常
     - 图片附件上传/预览/发送正常
