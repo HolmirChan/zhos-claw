@@ -24,7 +24,7 @@ Web 前端语音输入支持实时流式识别（边说边出字），替换当�
   │                                              │── wss://openspeech.bytedance.com─▶│
   │                                              │   /api/v3/sauc/bigmodel           │
   │                                              │   Headers:                        │
-  │                                              │     X-Api-App-Key: {api_key}     │
+  │                                              │     X-Api-Key: {api_key}         │
   │                                              │     X-Api-Resource-Id: {res_id}  │
   │                                              │     X-Api-Request-Id: {uuid}     │
   │                                              │     X-Api-Sequence: -1           │
@@ -93,18 +93,12 @@ type StreamingResult struct {
 | 参数 | 值 | 说明 |
 |------|-----|------|
 | URL | `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel` | v3 SAUC 大模型端点 |
-| X-Api-App-Key | `{api_key}` | 火山控制台 APP Key，取自 `api_keys[0]` |
-| X-Api-Resource-Id | `{resource_id}` | 资源 ID，见下表 |
-| X-Api-Request-Id | `{uuid}` | 任务追踪，每次连接随机 UUID |
+| X-Api-Key | `{api_key}` | 新版控制台 APP Key，取自 `api_keys[0]` |
+| X-Api-Resource-Id | `{resource_id}` | 资源 ID |
+| X-Api-Request-Id | `{uuid}` | 任务追踪 UUID |
 | X-Api-Sequence | `-1` | 固定值 |
 
-> **Resource ID 取值**（控制台开通时分配）：
-> - 豆包流式语音识别模型 1.0 小时版：`volc.bigasr.sauc.duration`
-> - 豆包流式语音识别模型 1.0 并发版：`volc.bigasr.sauc.concurrent`
-> - 豆包流式语音识别模型 2.0 小时版：`volc.seedasr.sauc.duration`
-> - 豆包流式语音识别模型 2.0 并发版：`volc.seedasr.sauc.concurrent`
->
-> 鉴权参考：[豆包语音 WebSocket 接口文档](https://www.volcengine.com/docs/6561/1354869)
+> 参考：[豆包语音大模型流式识别 API](https://www.volcengine.com/docs/6561/1354869)
 
 #### 2.2 Binary 协议 Header 布局（4 字节，大端序）
 
@@ -135,50 +129,47 @@ Byte 3  │    Reserved      │    Reserved      │
 | | `0b1001` | Full Server Response（识别结果，服务端→客户端） |
 | | `0b1011` | Server ACK（无 payload 应答帧，服务端→客户端，**忽略即可**） |
 | | `0b1111` | Error Message（服务端错误） |
-| Type-Specific Flags | `0b0000` | Full Client Request 固定值 |
-| | `0b0001` | 音频包带正序列号（普通帧） |
-| | `0b0011` | 音频包带负序列号（最后一帧，结束标记） |
+| Type-Specific Flags | `0b0000` | Full Client Request 固定值（header 后 4B 不为 seq） |
+| | `0b0001` | header 后 4B 为正 seq 号（普通音频帧） |
+| | `0b0010` | header 后 4B 不为 seq，仅指示最后一包（结束帧） |
+| | `0b0011` | header 后 4B 为负 seq 号（最后一包+seq） |
 | Serialization | `0b0000` | Raw bytes（音频数据） |
 | | `0b0001` | JSON |
 | Compression | `0b0000` | 不压缩 |
 | | `0b0001` | gzip |
 | Reserved | `0x00` | 全零填充 |
 
-#### 2.3 Sequence 管理与结束帧
+#### 2.3 Sequence 管理与帧格式
 
-音频包（Message Type `0b0010`）通过 Type-Specific Flags 管理序列号：
+音频帧（`0b0010`）格式：`[4B header][4B payload_size][payload]`（flags 含 seq 时 header 后额外 4B seq）
 
-- 普通帧：Flags = `0b0001`，payload 前 4 字节为 **正** int32 序号
-- 结束帧：Flags = `0b0011`，payload 前 4 字节为 **负** int32 序号（最后一包）
-- 火山服务端收到负序号后触发 final utterance（`definite=true`）
+- 普通帧：Flags = `0b0001`，格式 `[header][4B seq][4B payload_size][payload]`
+- 结束帧：Flags = `0b0010`，格式 `[header][4B payload_size][payload]`（不携带 seq）
+- 服务端全量响应：**始终**含 Sequence 字段 `[4B header][4B sequence][4B payload_size][payload]`
+- 错误帧：`[4B header][4B error_code][4B error_size][error_msg]`（不含 sequence 和 payload_size）
 
 > **压缩策略**：PCM 是随机分布的二进制数据，gzip 几乎无压缩比却显著消耗 CPU。音频帧 Compression 固定 `0b0000`（不压缩）。仅 Full Client Request 的 JSON payload 使用 gzip（Compression=`0b0001`）。
 
 **发送流程：**
 
 ```
-1. Full Client Request (0b0001, flags=0b0000, Compression=gzip, JSON payload)
-   → 包含 appid, uid, audio{format:"raw", codec:"pcm_s16le", rate:16000, ...}
-2. Audio-only Request (0b0010, flags=0b0001, Compression=0b0000, seq=1) → PCM chunk 不压缩
-3. Audio-only Request (0b0010, flags=0b0001, Compression=0b0000, seq=2) → PCM chunk 不压缩
-4. ... 中间可能收到 Server ACK (0b1011)，忽略即可
-N. Audio-only Request (0b0010, flags=0b0011, Compression=0b0000, seq=-N) → 最后一帧
-   ← Server: utterance(definite=true)
+1. Full Client Request (0b0001, flags=0b0000, Compress=gzip, JSON payload)
+   → user{uid}, audio{format:"pcm", rate:16000, bits:16, channel:1, language:"zh-CN"},
+     request{model_name:"bigmodel", enable_itn:true, enable_punc:true}
+2. Audio-only Request (0b0010, flags=0b0001, Compress=0b0000, seq=1) → PCM chunk
+3. Audio-only Request (0b0010, flags=0b0001, Compress=0b0000, seq=2) → PCM chunk
+N. Audio-only Request (0b0010, flags=0b0010, Compress=0b0000) → 最后一帧（无 seq）
 ```
 
 #### 2.4 Full Client Request payload（v3 SAUC BigModel）
 
 ```json
 {
-  "app": {
-    "appid": "{app_id}"
-  },
   "user": {
     "uid": "{unique_user_id}"
   },
   "audio": {
-    "format": "raw",
-    "codec": "pcm_s16le",
+    "format": "pcm",
     "rate": 16000,
     "bits": 16,
     "channel": 1,
@@ -186,7 +177,6 @@ N. Audio-only Request (0b0010, flags=0b0011, Compression=0b0000, seq=-N) → 最
   },
   "request": {
     "model_name": "bigmodel",
-    "result_type": "full",
     "enable_itn": true,
     "enable_punc": true
   }
@@ -194,9 +184,10 @@ N. Audio-only Request (0b0010, flags=0b0011, Compression=0b0000, seq=-N) → 最
 ```
 
 > 注意：
-> - v3 鉴权走 HTTP 头部 `X-Api-Access-Key`，payload 中**不需要** `app.token` 和 `app.cluster` 字段。`audio.format` 为 `"raw"`（非 `"pcm"`），配合 `codec: "pcm_s16le"`。
-> - `request.model_name` 字段值**以火山控制台分配为准**（可能为 `bigmodel`、`seed_asr_zh_v2` 等），请对照控制台开通的模型名称填写。
-> - `result_type: "full"` 确保火山每次返回**累积所有 utterances 数组**，后端直接遍历 `result.utterances[]` 映射到前端消息。累积责任在火山侧，后端无需自行维护已确认句列表。
+> - v3 鉴权走 HTTP 头部 `X-Api-Key`，payload 中**不需要** `app` 字段。
+> - `result_type` 默认为 `"full"`（全量返回），无需显式指定。
+> - `audio.format` 为 `"pcm"`（非 `"raw"`），codec 默认为 raw/pcm_s16le 无需指定。
+> - 参考：[官方 API 文档](https://www.volcengine.com/docs/6561/1354869)。
 
 #### 2.5 后端→前端映射规则（方案 A：后端去重）
 
@@ -281,7 +272,7 @@ type ModelConfig struct {
 }
 ```
 
-> 凭证说明：火山 v3 SAUC 使用 `api_keys[0]` → `X-Api-App-Key` 鉴权，`api_keys` 为项目已有的 SecureStrings 类型（支持 plaintext/file:///enc://）。`app_id` 即火山应用 ID（填入 payload `app.appid`），`resource_id` 对应控制台开通的资源 ID。
+> 凭证说明：火山 v3 SAUC 新版控制台使用 `api_keys[0]` → `X-Api-Key` 鉴权，`api_keys` 为项目已有的 SecureStrings 类型。`resource_id` 对应控制台开通的资源 ID。payload 中不需要 `app` 字段。
 
 ### 5. `web/backend/api/voice.go` — 新增 WebSocket handler
 
@@ -391,7 +382,6 @@ interface VoiceRecorderProps {
       "provider": "volcengine-asr",
       "api_base": "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel",
       "api_keys": ["your_app_key"],
-      "app_id": "your_app_id",
       "resource_id": "volc.bigasr.sauc.duration"
     }
   ],
@@ -404,8 +394,7 @@ interface VoiceRecorderProps {
 ```
 
 > **凭证字段映射到火山控制台：**
-> - `api_keys[0]`：控制台 → 语音技术 → 应用列表 → 应用详情 → **App Key**（→ HTTP 头 `X-Api-App-Key`）
-> - `app_id`：控制台 → 语音技术 → 应用列表 → 应用详情 → **APP ID**（→ payload `app.appid`）
+> - `api_keys[0]`：控制台 → 语音技术 → 应用列表 → **App Key**（→ HTTP 头 `X-Api-Key`）
 > - `resource_id`：控制台开通的资源 ID，如 `volc.bigasr.sauc.duration`（→ HTTP 头 `X-Api-Resource-Id`）
 
 ## 交互流程
@@ -425,7 +414,7 @@ interface VoiceRecorderProps {
 
 | 火山错误码 | 分类 | 前端 message |
 |-----------|------|-------------|
-| `45000001` | 配置错误（非重试） | "ASR 参数配置错误，请检查 app_id" |
+| `45000001` | 配置错误（非重试） | "ASR 参数配置错误，请检查请求参数" |
 | `40200002` | 鉴权失败（非重试） | "ASR 鉴权失败，请检查 App Key" |
 | `40200010` | 配额超限 | "ASR 时长配额已用尽，请充值或申请更多配额" |
 | `40200011` | QPS 超限 | "ASR 请求过于频繁，请稍后重试" |

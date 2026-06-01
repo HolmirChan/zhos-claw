@@ -25,6 +25,7 @@ const (
 
 	volcengineFlagNone        = 0b0000
 	volcengineFlagPosSequence = 0b0001
+	volcengineFlagLastNoSeq   = 0b0010 // 最后一包，无 seq
 	volcengineFlagNegWithSeq  = 0b0011
 
 	volcengineSerialRaw  = 0b0000
@@ -51,29 +52,27 @@ func decodeVolcengineHeader(h [4]byte) (msgType, flags, serialization, compressi
 	return
 }
 
-func buildFullClientRequestPayload(appID, uid string) map[string]any {
+func buildFullClientRequestPayload(uid string) map[string]any {
 	return map[string]any{
-		"app":  map[string]string{"appid": appID},
 		"user": map[string]string{"uid": uid},
 		"audio": map[string]any{
-			"format":   "raw",
-			"codec":    "pcm_s16le",
+			"format":   "pcm",
 			"rate":     16000,
 			"bits":     16,
 			"channel":  1,
 			"language": "zh-CN",
 		},
 		"request": map[string]any{
-			"model_name":  "bigmodel",
-			"result_type": "full",
-			"enable_itn":  true,
-			"enable_punc": true,
+			"model_name":     "bigmodel",
+			"enable_itn":     true,
+			"enable_punc":    true,
+			"show_utterances": true,
 		},
 	}
 }
 
-func buildFullClientFrame(appID, uid string) ([]byte, error) {
-	payloadJSON, err := json.Marshal(buildFullClientRequestPayload(appID, uid))
+func buildFullClientFrame(uid string) ([]byte, error) {
+	payloadJSON, err := json.Marshal(buildFullClientRequestPayload(uid))
 	if err != nil {
 		return nil, err
 	}
@@ -95,17 +94,20 @@ func buildFullClientFrame(appID, uid string) ([]byte, error) {
 	return frame, nil
 }
 
-// encodeAudioOnlyFrame returns header, seqBytes (4B), payloadSize (4B), payload.
-// Audio frames: [4B header][4B seq][4B payload_size][payload], Compression=0b0000 (no gzip for PCM).
+// encodeAudioOnlyFrame returns header, seqBytes (4B, only when !isLast), payloadSize (4B), payload.
+// Regular frame: [4B header][4B seq][4B payload_size][payload]
+// Last frame (flags=0b0010): [4B header][4B payload_size][payload] — no seq
+// Compression=0b0000 (no gzip for PCM).
 func encodeAudioOnlyFrame(audioData []byte, seq int32, isLast bool) (header [4]byte, seqBytes []byte, payloadSize []byte, payload []byte) {
-	var flags byte = volcengineFlagPosSequence
+	flags := byte(volcengineFlagPosSequence)
 	if isLast {
-		flags = volcengineFlagNegWithSeq
-		seq = -seq
+		flags = volcengineFlagLastNoSeq
 	}
 	header = encodeVolcengineHeader(volcengineMsgAudioOnlyReq, flags, volcengineSerialRaw, volcengineCompressNone)
-	seqBytes = make([]byte, 4)
-	binary.BigEndian.PutUint32(seqBytes, uint32(seq))
+	if !isLast {
+		seqBytes = make([]byte, 4)
+		binary.BigEndian.PutUint32(seqBytes, uint32(seq))
+	}
 	payloadSize = make([]byte, 4)
 	binary.BigEndian.PutUint32(payloadSize, uint32(len(audioData)))
 	return header, seqBytes, payloadSize, audioData
@@ -192,7 +194,7 @@ type volcengineStreamingSession struct {
 func newVolcengineSession(ctx context.Context, modelCfg *config.ModelConfig) (*volcengineStreamingSession, error) {
 	dialer := websocket.DefaultDialer
 	headers := http.Header{}
-	headers.Set("X-Api-App-Key", modelCfg.APIKey())
+	headers.Set("X-Api-Key", modelCfg.APIKey())
 	if modelCfg.ResourceID == "" {
 		modelCfg.ResourceID = "volc.bigasr.sauc.duration"
 	}
@@ -213,8 +215,7 @@ func newVolcengineSession(ctx context.Context, modelCfg *config.ModelConfig) (*v
 		cancel:  cancel,
 	}
 
-	appID := modelCfg.AppID
-	frame, err := buildFullClientFrame(appID, "web-user")
+	frame, err := buildFullClientFrame("web-user")
 	if err != nil {
 		conn.Close()
 		cancel()
@@ -251,14 +252,10 @@ func (s *volcengineStreamingSession) Results() <-chan StreamingResult {
 
 func (s *volcengineStreamingSession) Close() error {
 	s.closeOnce.Do(func() {
-		s.mu.Lock()
-		s.seq++
-		seq := s.seq
-		s.mu.Unlock()
-
-		header, seqBytes, payloadSize, _ := encodeAudioOnlyFrame(nil, seq, true)
-		frame := append(header[:], seqBytes...)
-		frame = append(frame, payloadSize...)
+		// Last frame: flags=0b0010, no seq, empty payload
+		header := encodeVolcengineHeader(volcengineMsgAudioOnlyReq, volcengineFlagLastNoSeq, volcengineSerialRaw, volcengineCompressNone)
+		payloadSize := make([]byte, 4) // zero
+		frame := append(header[:], payloadSize...)
 		s.conn.WriteMessage(websocket.BinaryMessage, frame)
 
 		s.cancel()
@@ -292,7 +289,7 @@ func (s *volcengineStreamingSession) readLoop() {
 
 		var header [4]byte
 		copy(header[:], msg[:4])
-		msgType, flags, _, compression := decodeVolcengineHeader(header)
+		msgType, _, _, compression := decodeVolcengineHeader(header)
 		body := msg[4:]
 
 		switch msgType {
@@ -300,32 +297,30 @@ func (s *volcengineStreamingSession) readLoop() {
 			continue
 
 		case volcengineMsgError:
-			offset := 0
-			if flags == volcengineFlagPosSequence {
-				offset = 4
-			}
-			if len(body) < offset+4 {
+			// Error frame: [4B header][4B error_code][4B error_size][error_msg]
+			if len(body) < 8 {
 				continue
 			}
-			payloadSize := binary.BigEndian.Uint32(body[offset : offset+4])
-			payload := body[offset+4 : offset+4+int(payloadSize)]
-			if compression == volcengineCompressGzip {
-				payload, _ = gunzip(payload)
+			errorCode := binary.BigEndian.Uint32(body[0:4])
+			errorSize := binary.BigEndian.Uint32(body[4:8])
+			if len(body) < 8+int(errorSize) {
+				continue
 			}
-			code, message := parseVolcengineError(payload)
-			s.results <- StreamingResult{Error: volcengineErrorMessage(code, message)}
+			errorMsg := string(body[8 : 8+errorSize])
+			s.results <- StreamingResult{Error: volcengineErrorMessage(int(errorCode), errorMsg)}
 			return
 
 		case volcengineMsgFullServerResp:
-			offset := 0
-			if flags == volcengineFlagPosSequence {
-				offset = 4
-			}
-			if len(body) < offset+4 {
+			// Response frame: [4B header][4B sequence][4B payload_size][payload]
+			// Sequence is always present for server responses
+			if len(body) < 8 {
 				continue
 			}
-			payloadSize := binary.BigEndian.Uint32(body[offset : offset+4])
-			payload := body[offset+4 : offset+4+int(payloadSize)]
+			payloadSize := binary.BigEndian.Uint32(body[4:8])
+			if len(body) < 8+int(payloadSize) {
+				continue
+			}
+			payload := body[8 : 8+payloadSize]
 			if compression == volcengineCompressGzip {
 				payload, _ = gunzip(payload)
 			}
@@ -366,7 +361,7 @@ func (s *volcengineStreamingSession) dedupAndPush(utterances []StreamingResult) 
 func volcengineErrorMessage(code int, msg string) string {
 	switch code {
 	case 45000001:
-		return "ASR 参数配置错误，请检查 app_id"
+		return "ASR 参数配置错误，请检查请求参数"
 	case 40200002:
 		return "ASR 鉴权失败，请检查 App Key"
 	case 40200010:

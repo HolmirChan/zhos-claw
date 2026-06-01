@@ -87,23 +87,20 @@ func TestVolcengineHeaderDecode(t *testing.T) {
 }
 
 func TestBuildFullClientRequestPayload(t *testing.T) {
-	payload := buildFullClientRequestPayload("test-app-id", "test-uid")
-	if payload["app"].(map[string]string)["appid"] != "test-app-id" {
-		t.Error("appid mismatch")
+	payload := buildFullClientRequestPayload("test-uid")
+	if payload["app"] != nil {
+		t.Error("no app field expected in v3 payload")
 	}
 	audio := payload["audio"].(map[string]any)
-	if audio["format"] != "raw" {
-		t.Errorf("audio.format = %v, want raw", audio["format"])
-	}
-	if audio["codec"] != "pcm_s16le" {
-		t.Errorf("audio.codec = %v, want pcm_s16le", audio["codec"])
+	if audio["format"] != "pcm" {
+		t.Errorf("audio.format = %v, want pcm", audio["format"])
 	}
 	if audio["rate"] != 16000 {
 		t.Errorf("audio.rate = %v, want 16000", audio["rate"])
 	}
 	req := payload["request"].(map[string]any)
-	if req["result_type"] != "full" {
-		t.Errorf("request.result_type = %v, want full", req["result_type"])
+	if req["model_name"] != "bigmodel" {
+		t.Errorf("request.model_name = %v, want bigmodel", req["model_name"])
 	}
 }
 
@@ -123,10 +120,13 @@ func TestEncodeAudioOnlyFrame(t *testing.T) {
 		t.Errorf("payload len = %d, want 4", len(payload))
 	}
 
-	header2, _, _, _ := encodeAudioOnlyFrame([]byte{0, 1, 2, 3}, 3, true)
+	header2, seqBytes2, _, _ := encodeAudioOnlyFrame([]byte{0, 1, 2, 3}, 3, true)
 	_, flags2, _, _ := decodeVolcengineHeader(header2)
-	if flags2 != volcengineFlagNegWithSeq {
-		t.Errorf("flags = %04b, want %04b (neg)", flags2, volcengineFlagNegWithSeq)
+	if flags2 != volcengineFlagLastNoSeq {
+		t.Errorf("flags = %04b, want %04b (last, no seq)", flags2, volcengineFlagLastNoSeq)
+	}
+	if len(seqBytes2) != 0 {
+		t.Error("last frame should have no seq bytes")
 	}
 }
 
