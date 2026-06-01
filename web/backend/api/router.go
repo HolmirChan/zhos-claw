@@ -117,6 +117,7 @@ func (h *Handler) registerVoiceRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/voice/transcribe", h.handleVoiceTranscribe)
 	mux.HandleFunc("POST /api/voice/synthesize", h.handleVoiceSynthesize)
 	mux.HandleFunc("GET /api/voice/audio/{file_id}", h.handleVoiceAudio)
+	mux.HandleFunc("GET /api/voice/stream", h.handleVoiceStream)
 }
 
 // Shutdown gracefully shuts down the handler, stopping the gateway if it was started by this handler.

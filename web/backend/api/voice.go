@@ -3,11 +3,14 @@ package api
 import (
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/sipeed/picoclaw/pkg/audio/asr"
 	"github.com/sipeed/picoclaw/pkg/audio/tts"
 	"github.com/sipeed/picoclaw/pkg/config"
@@ -21,12 +24,14 @@ const maxVoiceUploadSize = 10 << 20 // 10 MB
 func (h *Handler) handleVoiceCapabilities(w http.ResponseWriter, r *http.Request) {
 	cfg, err := config.LoadConfig(h.configPath)
 	if err != nil {
-		writeJSON(w, http.StatusOK, map[string]bool{"asr": false, "tts": false})
+		writeJSON(w, http.StatusOK, map[string]any{"asr": false, "tts": false, "streaming": false})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{
-		"asr": asr.DetectTranscriber(cfg) != nil,
-		"tts": tts.DetectTTS(cfg) != nil,
+	streamingTranscriber, _ := asr.DetectStreamingTranscriber(cfg)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"asr":       asr.DetectTranscriber(cfg) != nil,
+		"tts":       tts.DetectTTS(cfg) != nil,
+		"streaming": streamingTranscriber != nil,
 	})
 }
 
@@ -192,4 +197,151 @@ func cleanTTSCache(dir string, maxAge time.Duration) {
 			os.Remove(filepath.Join(dir, e.Name()))
 		}
 	}
+}
+
+// cidrMatch reports whether remoteAddr falls within any of the given CIDR networks.
+func cidrMatch(remoteAddr string, cidrs []string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	for _, c := range cidrs {
+		_, ipnet, err := net.ParseCIDR(c)
+		if err == nil && ipnet.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+var voiceStreamUpgrader = websocket.Upgrader{
+	ReadBufferSize:  4096,
+	WriteBufferSize: 4096,
+}
+
+// handleVoiceStream handles WebSocket streaming ASR.
+//
+//	GET /api/voice/stream
+func (h *Handler) handleVoiceStream(w http.ResponseWriter, r *http.Request) {
+	// TODO: 若前端经 nginx/反代访问，remoteAddr 为 127.0.0.1，
+	// 需改为读取 X-Forwarded-For 或 X-Real-IP 头（从 r.Header 取）。
+	voiceStreamUpgrader.CheckOrigin = func(r *http.Request) bool {
+		if !h.serverPublic {
+			return true
+		}
+		if len(h.serverCIDRs) == 0 {
+			return true
+		}
+		return cidrMatch(r.RemoteAddr, h.serverCIDRs)
+	}
+
+	conn, err := voiceStreamUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	cfg, err := config.LoadConfig(h.configPath)
+	if err != nil {
+		writeWSJSON(conn, map[string]string{"type": "error", "code": "config", "message": "配置加载失败"})
+		return
+	}
+
+	transcriber, _ := asr.DetectStreamingTranscriber(cfg)
+	if transcriber == nil {
+		writeWSJSON(conn, map[string]string{"type": "error", "code": "no_provider", "message": "未配置流式 ASR"})
+		return
+	}
+
+	session, err := transcriber.StartStream(r.Context(), asr.StreamingConfig{
+		Codec:      "pcm_s16le",
+		SampleRate: 16000,
+		Bits:       16,
+		Channels:   1,
+		Language:   "zh-CN",
+	})
+	if err != nil {
+		writeWSJSON(conn, map[string]string{"type": "error", "code": "connect", "message": err.Error()})
+		return
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// Goroutine 1: read audio chunks from frontend -> send to volcengine
+	go func() {
+		defer wg.Done()
+		defer session.Close()
+		for {
+			_, msg, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
+			if err := session.SendAudio(msg); err != nil {
+				return
+			}
+		}
+	}()
+
+	// Goroutine 2: read results from volcengine -> send to frontend
+	// Per-slot accumulation using result.Index (from dedup):
+	// - definite=true  -> locked += text, current[Index] = ""
+	// - definite=false -> current[Index] = text
+	go func() {
+		defer wg.Done()
+		var locked string
+		current := make(map[int]string)
+		maxIdx := -1
+
+		for result := range session.Results() {
+			if result.Error != "" {
+				writeWSJSON(conn, map[string]string{
+					"type":    "error",
+					"message": result.Error,
+				})
+				return
+			}
+
+			if result.Index > maxIdx {
+				maxIdx = result.Index
+			}
+
+			if result.Definite {
+				locked += result.Text
+				current[result.Index] = ""
+			} else {
+				current[result.Index] = result.Text
+			}
+
+			writeWSJSON(conn, map[string]any{
+				"type":     "partial",
+				"text":     result.Text,
+				"definite": result.Definite,
+			})
+		}
+
+		// Channel closed = stream ended, send final accumulated text
+		var curText string
+		for i := 0; i <= maxIdx; i++ {
+			curText += current[i]
+		}
+		fullText := locked + curText
+		if fullText != "" {
+			writeWSJSON(conn, map[string]string{
+				"type": "final",
+				"text": fullText,
+			})
+		}
+	}()
+
+	wg.Wait()
+}
+
+func writeWSJSON(conn *websocket.Conn, v any) {
+	data, _ := json.Marshal(v)
+	conn.WriteMessage(websocket.TextMessage, data)
 }
