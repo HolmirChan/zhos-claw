@@ -3,10 +3,17 @@ package asr
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
+	"crypto/rand"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"sync"
+
+	"github.com/gorilla/websocket"
+	"github.com/sipeed/picoclaw/pkg/config"
 )
 
 const (
@@ -150,4 +157,249 @@ func gunzip(data []byte) ([]byte, error) {
 	}
 	defer r.Close()
 	return io.ReadAll(r)
+}
+
+// volcengineStreamingTranscriber is the factory that holds model config.
+type volcengineStreamingTranscriber struct {
+	modelCfg *config.ModelConfig
+}
+
+func (v *volcengineStreamingTranscriber) Name() string {
+	return "volcengine-asr"
+}
+
+func (v *volcengineStreamingTranscriber) StartStream(ctx context.Context, _ StreamingConfig) (StreamingSession, error) {
+	return newVolcengineSession(ctx, v.modelCfg)
+}
+
+type utteranceSnapshot struct {
+	Text     string
+	Definite bool
+}
+
+type volcengineStreamingSession struct {
+	conn     *websocket.Conn
+	results  chan StreamingResult
+	ctx      context.Context
+	cancel   context.CancelFunc
+	closeOnce sync.Once
+	seq      int32
+
+	mu             sync.Mutex
+	lastUtterances []utteranceSnapshot
+}
+
+func newVolcengineSession(ctx context.Context, modelCfg *config.ModelConfig) (*volcengineStreamingSession, error) {
+	dialer := websocket.DefaultDialer
+	headers := http.Header{}
+	headers.Set("X-Api-App-Key", modelCfg.AppKey)
+	headers.Set("X-Api-Access-Key", modelCfg.AccessKey)
+	if modelCfg.ResourceID == "" {
+		modelCfg.ResourceID = "volc.bigasr.sauc.duration"
+	}
+	headers.Set("X-Api-Resource-Id", modelCfg.ResourceID)
+	headers.Set("X-Api-Request-Id", newUUID())
+
+	conn, _, err := dialer.DialContext(ctx, modelCfg.APIBase, headers)
+	if err != nil {
+		return nil, fmt.Errorf("volcengine dial: %w", err)
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	s := &volcengineStreamingSession{
+		conn:    conn,
+		results: make(chan StreamingResult, 64),
+		ctx:     ctx,
+		cancel:  cancel,
+	}
+
+	appID := modelCfg.AppID
+	frame, err := buildFullClientFrame(appID, "web-user")
+	if err != nil {
+		conn.Close()
+		cancel()
+		return nil, fmt.Errorf("build full client frame: %w", err)
+	}
+	if err := conn.WriteMessage(websocket.BinaryMessage, frame); err != nil {
+		conn.Close()
+		cancel()
+		return nil, fmt.Errorf("send full client request: %w", err)
+	}
+
+	go s.readLoop()
+	return s, nil
+}
+
+func (s *volcengineStreamingSession) SendAudio(chunk []byte) error {
+	s.mu.Lock()
+	s.seq++
+	seq := s.seq
+	s.mu.Unlock()
+
+	header, seqBytes, payloadSize, payload := encodeAudioOnlyFrame(chunk, seq, false)
+	frame := make([]byte, 0, 4+4+4+len(payload))
+	frame = append(frame, header[:]...)
+	frame = append(frame, seqBytes...)
+	frame = append(frame, payloadSize...)
+	frame = append(frame, payload...)
+	return s.conn.WriteMessage(websocket.BinaryMessage, frame)
+}
+
+func (s *volcengineStreamingSession) Results() <-chan StreamingResult {
+	return s.results
+}
+
+func (s *volcengineStreamingSession) Close() error {
+	s.closeOnce.Do(func() {
+		s.mu.Lock()
+		s.seq++
+		seq := s.seq
+		s.mu.Unlock()
+
+		header, seqBytes, payloadSize, _ := encodeAudioOnlyFrame(nil, seq, true)
+		frame := append(header[:], seqBytes...)
+		frame = append(frame, payloadSize...)
+		s.conn.WriteMessage(websocket.BinaryMessage, frame)
+
+		s.cancel()
+		s.conn.Close()
+	})
+	return nil
+}
+
+func (s *volcengineStreamingSession) readLoop() {
+	defer close(s.results)
+	defer s.conn.Close()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		default:
+		}
+
+		_, msg, err := s.conn.ReadMessage()
+		if err != nil {
+			if !isClosedError(err) {
+				s.results <- StreamingResult{Error: fmt.Sprintf("read error: %v", err)}
+			}
+			return
+		}
+
+		if len(msg) < 4 {
+			continue
+		}
+
+		var header [4]byte
+		copy(header[:], msg[:4])
+		msgType, flags, _, compression := decodeVolcengineHeader(header)
+		body := msg[4:]
+
+		switch msgType {
+		case volcengineMsgServerACK:
+			continue
+
+		case volcengineMsgError:
+			offset := 0
+			if flags == volcengineFlagPosSequence {
+				offset = 4
+			}
+			if len(body) < offset+4 {
+				continue
+			}
+			payloadSize := binary.BigEndian.Uint32(body[offset : offset+4])
+			payload := body[offset+4 : offset+4+int(payloadSize)]
+			if compression == volcengineCompressGzip {
+				payload, _ = gunzip(payload)
+			}
+			code, message := parseVolcengineError(payload)
+			s.results <- StreamingResult{Error: volcengineErrorMessage(code, message)}
+			return
+
+		case volcengineMsgFullServerResp:
+			offset := 0
+			if flags == volcengineFlagPosSequence {
+				offset = 4
+			}
+			if len(body) < offset+4 {
+				continue
+			}
+			payloadSize := binary.BigEndian.Uint32(body[offset : offset+4])
+			payload := body[offset+4 : offset+4+int(payloadSize)]
+			if compression == volcengineCompressGzip {
+				payload, _ = gunzip(payload)
+			}
+			utterances := parseUtterances(payload)
+			s.dedupAndPush(utterances)
+		}
+	}
+}
+
+func (s *volcengineStreamingSession) dedupAndPush(utterances []StreamingResult) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i, u := range utterances {
+		u.Index = i
+		if i < len(s.lastUtterances) {
+			prev := s.lastUtterances[i]
+			if prev.Text == u.Text && prev.Definite == u.Definite {
+				continue // unchanged
+			}
+			if prev.Definite && !u.Definite {
+				continue // safety: definite never goes true->false
+			}
+		}
+		select {
+		case s.results <- u:
+		case <-s.ctx.Done():
+			return
+		}
+	}
+
+	s.lastUtterances = make([]utteranceSnapshot, len(utterances))
+	for i, u := range utterances {
+		s.lastUtterances[i] = utteranceSnapshot{Text: u.Text, Definite: u.Definite}
+	}
+}
+
+func volcengineErrorMessage(code int, msg string) string {
+	switch code {
+	case 45000001:
+		return "ASR 参数配置错误，请检查 app_id"
+	case 40200002:
+		return "ASR 鉴权失败，请检查 App Key / Access Key"
+	case 40200010:
+		return "ASR 时长配额已用尽，请充值或申请更多配额"
+	case 40200011:
+		return "ASR 请求过于频繁，请稍后重试"
+	case 45000081:
+		return "ASR 请求超时，请重试"
+	case 40200004:
+		return "ASR 服务未开通，请在火山控制台开通语音识别服务"
+	case 55000000:
+		return "ASR 服务暂时不可用，请稍后重试"
+	case 55000031:
+		return "ASR 服务繁忙，请稍后重试"
+	default:
+		return msg
+	}
+}
+
+func newUUID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+}
+
+func isClosedError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if _, ok := err.(*websocket.CloseError); ok {
+		return true
+	}
+	return false
 }
