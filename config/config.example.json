@@ -104,6 +104,22 @@
       "model": "openai/gpt-5.4",
       "api_keys": ["sk-key2"],
       "api_base": "https://api2.example.com/v1"
+    },
+    {
+      "model_name": "volcengine-asr",
+      "provider": "volcengine",
+      "model": "bigmodel",
+      "api_keys": ["your-speech-app-key"],
+      "api_base": "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel",
+      "resource_id": "volc.bigasr.sauc.duration"
+    },
+    {
+      "model_name": "volcengine-tts",
+      "provider": "volcengine",
+      "model": "seed-tts-2.0",
+      "api_keys": ["your-speech-app-key"],
+      "api_base": "https://openspeech.bytedance.com/api/v3/tts",
+      "resource_id": "seed-tts-2.0"
     }
   ],
   "channel_list": {
@@ -539,6 +555,10 @@
   },
   "voice": {
     "model_name": "",
+    "tts_model_name": "volcengine-tts",
+    "tts_voice": "zh_female_shuangkuaisisi_uranus_bigtts",
+    "tts_format": "mp3",
+    "streaming_model_name": "volcengine-asr",
     "echo_transcription": false
   },
   "hooks": {
