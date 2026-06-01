@@ -160,7 +160,7 @@ func DetectStreamingTranscriber(cfg *config.Config) (StreamingTranscriber, error
 	}
 
 	protocol, _ := providers.ExtractProtocol(modelCfg)
-	if protocol == "volcengine-asr" {
+	if protocol == "volcengine" {
 		return &volcengineStreamingTranscriber{modelCfg: modelCfg}, nil
 	}
 

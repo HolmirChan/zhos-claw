@@ -204,15 +204,15 @@ func DefaultConfig() *Config {
 			// Volcengine (火山引擎) ASR/TTS - https://console.volcengine.com/speech
 			// 新版控制台用 X-Api-Key 鉴权，填入 api_keys[0] 即可
 			{
-				ModelName:  "volcengine-asr",
-				Provider:   "volcengine-asr",
+				ModelName:  "volcengine",
+				Provider:   "volcengine",
 				Model:      "bigmodel",
 				APIBase:    "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel",
 				ResourceID: "volc.bigasr.sauc.duration",
 			},
 			{
-				ModelName:  "volcengine-tts",
-				Provider:   "volcengine-tts",
+				ModelName:  "volcengine",
+				Provider:   "volcengine",
 				Model:      "seed-tts-2.0",
 				APIBase:    "https://openspeech.bytedance.com/api/v3/tts",
 				ResourceID: "seed-tts-2.0",
@@ -513,10 +513,10 @@ func DefaultConfig() *Config {
 		},
 		Voice: VoiceConfig{
 			ModelName:         "",
-			TTSModelName:      "volcengine-tts",
+			TTSModelName:      "volcengine",
 			TTSVoice:          "zh_female_shuangkuaisisi_uranus_bigtts",
 			TTSFormat:         "mp3",
-			StreamingModelName: "volcengine-asr",
+			StreamingModelName: "volcengine",
 			EchoTranscription: false,
 			ElevenLabsAPIKey:  "",
 		},
