@@ -5,7 +5,7 @@
 > 来源: BACKLOG.md（BL-010）
 > 设计文档: .scrum/specs/2026-06-02-launcher-tls-design.md
 > 实现计划: .scrum/plans/2026-06-02-launcher-tls.md
-> 状态: 进行中
+> 状态: 已完成
 
 ## 任务清单
 
@@ -92,20 +92,20 @@
   - [x] `http://IP:18800` 聊天等原有功能不受影响
   - [x] 清空 `<home>/tls/` 后重启 launcher，证书自动重生成，IP 变化时自动更新
 
-### SB-010 · TTS 音频持久化 + 随会话销毁 + 按需重建 [ ]
+### SB-010 · TTS 音频持久化 + 随会话销毁 + 按需重建 [x]
 - **来源**: BL-010 验收中发现
 - **文件**: `web/backend/api/session.go`（修改）、`web/backend/api/voice.go`（修改）、`web/frontend/src/components/chat/assistant-message.tsx`（修改）
 - **方案**: session 目录下维护 `audio_urls.json`，音频文件跟随 session 生命周期（删除会话 → 清理音频）
 - **子任务**:
-  - [ ] 后端：TTS 合成后，写入 `<session_dir>/audio_urls.json`（`{message_index: "audio_url"}`）
-  - [ ] 后端：session 读取消息时，从 `audio_urls.json` 合并 `audio_url` 到 `sessionChatMessage`
-  - [ ] 后端：删除 session 时，根据 `audio_urls.json` 删除引用的 tts-cache 音频文件
-  - [ ] 后端：TTS 文件名改为文本 hash（同文本 → 同文件名），cleanTTSCache 清掉后重新合成自动补上原文件
-  - [ ] 后端：`cleanTTSCache` 改为纯兜底（保留但降频或仅 crash recovery）
-  - [ ] 前端：assistant-message 从消息 `audio_url` 字段读取，不再用 useState 内存态
-  - [ ] 前端：音频文件不存在时显示错误提示（而非静默失败）
-  - [ ] 刷新页面后，已合成过的消息仍显示播放按钮
-  - [ ] 删除会话后，对应音频文件被清理
-  - [ ] `go test -tags goolm,stdjson ./web/backend/api/...` PASS
-  - [ ] `npx tsc --noEmit` 零错误
-  - [ ] 提交
+  - [x] 后端：TTS 合成后，写入 `<session_dir>/audio_urls.json`（`{message_index: "audio_url"}`）
+  - [x] 后端：session 读取消息时，从 `audio_urls.json` 合并 `audio_url` 到 `sessionChatMessage`
+  - [x] 后端：删除 session 时，根据 `audio_urls.json` 删除引用的 tts-cache 音频文件
+  - [x] 后端：TTS 文件名改为文本 hash（同文本 → 同文件名），cleanTTSCache 清掉后重新合成自动补上原文件
+  - [x] 后端：`cleanTTSCache` 改为纯兜底（保留但降频或仅 crash recovery）
+  - [x] 前端：assistant-message 从消息 `audio_url` 字段读取，不再用 useState 内存态
+  - [x] 前端：音频文件不存在时显示错误提示（而非静默失败）
+  - [x] 刷新页面后，已合成过的消息仍显示播放按钮
+  - [x] 删除会话后，对应音频文件被清理
+  - [x] `go test -tags goolm,stdjson ./web/backend/api/...` PASS
+  - [x] `npx tsc --noEmit` 零错误
+  - [x] 提交
