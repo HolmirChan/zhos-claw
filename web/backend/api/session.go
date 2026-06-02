@@ -968,7 +968,7 @@ func loadSessionAudioURLs(dir, sessionKey string) (map[int]string, error) {
 // saveSessionAudioURL writes a message index → audio_url mapping to audio_urls.json.
 func saveSessionAudioURL(dir, sessionKey string, msgIndex int, audioURL string) error {
 	m, err := loadSessionAudioURLs(dir, sessionKey)
-	if err != nil {
+	if err != nil || m == nil {
 		m = make(map[int]string)
 	}
 	m[msgIndex] = audioURL
