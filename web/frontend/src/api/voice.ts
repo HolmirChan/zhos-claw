@@ -40,3 +40,13 @@ export async function synthesizeSpeech(
 
   return res.json()
 }
+
+export async function fetchVersionURLs(): Promise<{ http_url: string; https_url: string }> {
+  const res = await launcherFetch("/api/system/version")
+  if (!res.ok) return { http_url: "", https_url: "" }
+  const data = await res.json()
+  return {
+    http_url: data.http_url || "",
+    https_url: data.https_url || "",
+  }
+}

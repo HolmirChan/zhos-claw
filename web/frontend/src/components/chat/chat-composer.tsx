@@ -1,5 +1,5 @@
 import { IconArrowUp, IconPhotoPlus, IconX } from "@tabler/icons-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { KeyboardEvent } from "react"
 import { useTranslation } from "react-i18next"
 import TextareaAutosize from "react-textarea-autosize"
@@ -12,6 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { fetchVersionURLs } from "@/api/voice"
 import { useVoice } from "@/hooks/use-voice"
 import { VoiceRecorder } from "./voice-recorder"
 import type { ChatAttachment, ContextUsage } from "@/store/chat"
@@ -56,6 +57,21 @@ export function ChatComposer({
   const { t } = useTranslation()
   const { outputEnabled, ttsAvailable, streamingAvailable, toggleOutput } = useVoice()
   const [showRecorder, setShowRecorder] = useState(false)
+  const [httpsUrl, setHttpsUrl] = useState("")
+  const [httpsUrlLoaded, setHttpsUrlLoaded] = useState(false)
+  const isSecure = typeof window !== "undefined" && window.isSecureContext
+
+  useEffect(() => {
+    if (!isSecure) {
+      fetchVersionURLs().then((urls) => {
+        setHttpsUrl(urls.https_url || `https://${location.hostname}:18443`)
+        setHttpsUrlLoaded(true)
+      }).catch(() => {
+        setHttpsUrl(`https://${location.hostname}:18443`)
+        setHttpsUrlLoaded(true)
+      })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const canInput = inputDisabledReason === null
   const disabledMessage =
     inputDisabledReason === null
@@ -153,7 +169,7 @@ export function ChatComposer({
             >
               <IconPhotoPlus className="size-4" />
             </Button>
-            {streamingAvailable ? (
+            {streamingAvailable && isSecure ? (
               <Button
                 type="button"
                 variant="ghost"
@@ -164,6 +180,17 @@ export function ChatComposer({
                 title={showRecorder ? "停止录音" : "语音输入"}
               >
                 <span className="text-base">{showRecorder ? "🎙️" : "🎤"}</span>
+              </Button>
+            ) : streamingAvailable && !isSecure ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground h-8 w-8 rounded-full"
+                disabled
+                title={httpsUrlLoaded ? `语音录音需通过 HTTPS 访问。请访问 ${httpsUrl}` : "语音录音需通过 HTTPS 访问"}
+              >
+                <span className="text-base">🔇</span>
               </Button>
             ) : null}
             {ttsAvailable && (
