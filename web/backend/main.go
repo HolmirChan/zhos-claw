@@ -627,8 +627,7 @@ func main() {
 	)
 
 	var tlsListeners []net.Listener
-	var httpsAddr string // set in Task 6
-	_ = httpsAddr
+	var httpsAddr string
 	if shouldStartTLS(effectivePublic, *noTLS) {
 		if err := validateTLSPort(portNum, tlsPortNum); err != nil {
 			logger.Fatalf("TLS 配置错误: %v", err)
@@ -714,6 +713,8 @@ func main() {
 	// Share the local URL with the launcher runtime.
 	serverAddr = fmt.Sprintf("http://%s", net.JoinHostPort(openResult.ProbeHost, effectivePort))
 	browserLaunchURL = serverAddr + launcherBrowserLaunchSuffix(needsInitialSetup, localAutoLogin)
+
+	apiHandler.SetLauncherURLs(serverAddr, httpsAddr)
 
 	// Auto-open browser will be handled by the launcher runtime.
 

@@ -23,6 +23,8 @@ type systemVersionResponse struct {
 	GitCommit string `json:"git_commit,omitempty"`
 	BuildTime string `json:"build_time,omitempty"`
 	GoVersion string `json:"go_version"`
+	HTTPURL   string `json:"http_url,omitempty"`
+	HTTPSURL  string `json:"https_url,omitempty"`
 }
 
 type cachedSystemVersion struct {
@@ -70,6 +72,8 @@ func (h *Handler) registerVersionRoutes(mux *http.ServeMux) {
 // handleGetVersion returns runtime version information for web clients.
 func (h *Handler) handleGetVersion(w http.ResponseWriter, r *http.Request) {
 	versionInfo := h.resolveSystemVersionInfo(r.Context())
+	versionInfo.HTTPURL = h.httpURL
+	versionInfo.HTTPSURL = h.httpsURL
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(versionInfo); err != nil {

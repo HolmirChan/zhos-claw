@@ -18,6 +18,8 @@ type Handler struct {
 	serverHostExplicit   bool
 	serverCIDRs          []string
 	debug                bool
+	httpURL              string
+	httpsURL             string
 	oauthMu              sync.Mutex
 	oauthFlows           map[string]*oauthFlow
 	oauthState           map[string]string
@@ -61,6 +63,11 @@ func (h *Handler) SetServerBindHost(hostInput string, explicit bool) {
 
 func (h *Handler) SetDebug(debug bool) {
 	h.debug = debug
+}
+
+func (h *Handler) SetLauncherURLs(httpURL, httpsURL string) {
+	h.httpURL = httpURL
+	h.httpsURL = httpsURL
 }
 
 // RegisterRoutes binds all API endpoint handlers to the ServeMux.
