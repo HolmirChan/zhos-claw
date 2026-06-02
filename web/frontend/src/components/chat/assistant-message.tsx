@@ -43,7 +43,6 @@ interface AssistantMessageProps {
   isComplete?: boolean
   audioUrl?: string
   sessionId?: string
-  msgIndex?: number
 }
 
 export function AssistantMessage({
@@ -55,7 +54,6 @@ export function AssistantMessage({
   isComplete = false,
   audioUrl: propAudioUrl,
   sessionId,
-  msgIndex,
 }: AssistantMessageProps) {
   const { t } = useTranslation()
   const { copy, isCopied } = useCopyToClipboard()
@@ -107,7 +105,7 @@ export function AssistantMessage({
     let cancelled = false
 
     setTtsLoading(true)
-    synthesizeSpeech(content, sessionId, msgIndex)
+    synthesizeSpeech(content, sessionId)
       .then((res) => {
         if (!cancelled) setAudioUrl(res.audio_url)
       })
@@ -276,8 +274,8 @@ export function AssistantMessage({
                   audioUrl={audioUrl}
                   onError={() => {
                     setAudioError(true)
-                    if (sessionId != null && msgIndex != null) {
-                      synthesizeSpeech(content, sessionId, msgIndex).then((res) => {
+                    if (sessionId != null) {
+                      synthesizeSpeech(content, sessionId).then((res) => {
                         setAudioUrl(res.audio_url)
                         setAudioError(false)
                       }).catch(() => {})

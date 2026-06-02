@@ -2,7 +2,9 @@ package api
 
 import (
 	"bufio"
+	"crypto/md5"
 	"encoding/json"
+	"fmt"
 	"errors"
 	"net/http"
 	"os"
@@ -926,8 +928,11 @@ func (h *Handler) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		if refErr == nil {
 			if audioURLs, loadErr := loadSessionAudioURLs(dir, ref.Key); loadErr == nil && len(audioURLs) > 0 {
 				for i := range messages {
-					if url, ok := audioURLs[i]; ok {
-						messages[i].AudioURL = url
+					if messages[i].Role == "assistant" {
+						h := fmt.Sprintf("%x", md5.Sum([]byte(messages[i].Content)))
+						if url, ok := audioURLs[h]; ok {
+							messages[i].AudioURL = url
+						}
 					}
 				}
 			}
@@ -949,7 +954,7 @@ func sessionAudioURLsFile(dir, sessionKey string) string {
 }
 
 // loadSessionAudioURLs reads the audio_urls.json sidecar for a session.
-func loadSessionAudioURLs(dir, sessionKey string) (map[int]string, error) {
+func loadSessionAudioURLs(dir, sessionKey string) (map[string]string, error) {
 	path := sessionAudioURLsFile(dir, sessionKey)
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -958,7 +963,7 @@ func loadSessionAudioURLs(dir, sessionKey string) (map[int]string, error) {
 		}
 		return nil, err
 	}
-	var m map[int]string
+	var m map[string]string
 	if err := json.Unmarshal(data, &m); err != nil {
 		return nil, err
 	}
@@ -966,12 +971,12 @@ func loadSessionAudioURLs(dir, sessionKey string) (map[int]string, error) {
 }
 
 // saveSessionAudioURL writes a message index → audio_url mapping to audio_urls.json.
-func saveSessionAudioURL(dir, sessionKey string, msgIndex int, audioURL string) error {
+func saveSessionAudioURL(dir, sessionKey string, contentMD5, audioURL string) error {
 	m, err := loadSessionAudioURLs(dir, sessionKey)
 	if err != nil || m == nil {
-		m = make(map[int]string)
+		m = make(map[string]string)
 	}
-	m[msgIndex] = audioURL
+	m[contentMD5] = audioURL
 	data, err := json.Marshal(m)
 	if err != nil {
 		return err
@@ -1005,14 +1010,14 @@ func (h *Handler) handleSaveSessionAudioURL(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var req struct {
-		MessageIndex int    `json:"message_index"`
-		AudioURL     string `json:"audio_url"`
+		ContentMD5 string `json:"content_md5"`
+		AudioURL   string `json:"audio_url"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
 		return
 	}
-	if req.AudioURL == "" {
+	if req.ContentMD5 == "" || req.AudioURL == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing audio_url"})
 		return
 	}
@@ -1026,7 +1031,7 @@ func (h *Handler) handleSaveSessionAudioURL(w http.ResponseWriter, r *http.Reque
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "session not found"})
 		return
 	}
-	if err := saveSessionAudioURL(dir, ref.Key, req.MessageIndex, req.AudioURL); err != nil {
+	if err := saveSessionAudioURL(dir, ref.Key, req.ContentMD5, req.AudioURL); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "save failed"})
 		return
 	}

@@ -104,9 +104,8 @@ func (h *Handler) handleVoiceTranscribe(w http.ResponseWriter, r *http.Request) 
 //	POST /api/voice/synthesize
 func (h *Handler) handleVoiceSynthesize(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Text         string `json:"text"`
-		SessionID    string `json:"session_id,omitempty"`
-		MessageIndex int    `json:"message_index,omitempty"`
+		Text      string `json:"text"`
+		SessionID string `json:"session_id,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Text == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺少 text 参数"})
@@ -141,7 +140,7 @@ func (h *Handler) handleVoiceSynthesize(w http.ResponseWriter, r *http.Request) 
 	// If cached file exists, skip synthesis
 	if _, statErr := os.Stat(filePath); statErr == nil {
 		audioURL := "/api/voice/audio/" + fileName
-		h.saveAudioURLIfNeeded(req.SessionID, req.MessageIndex, audioURL)
+		h.saveAudioURLIfNeeded(req.SessionID, req.Text, audioURL)
 		writeJSON(w, http.StatusOK, map[string]string{"audio_url": audioURL})
 		return
 	}
@@ -174,7 +173,7 @@ func (h *Handler) handleVoiceSynthesize(w http.ResponseWriter, r *http.Request) 
 	}
 
 	audioURL := "/api/voice/audio/" + fileName
-	h.saveAudioURLIfNeeded(req.SessionID, req.MessageIndex, audioURL)
+	h.saveAudioURLIfNeeded(req.SessionID, req.Text, audioURL)
 
 	writeJSON(w, http.StatusOK, map[string]string{"audio_url": audioURL})
 }
@@ -369,8 +368,8 @@ func writeWSJSON(conn *websocket.Conn, v any) {
 }
 
 // saveAudioURLIfNeeded persists the audio_url mapping for a session message.
-func (h *Handler) saveAudioURLIfNeeded(sessionID string, msgIndex int, audioURL string) {
-	if sessionID == "" || audioURL == "" {
+func (h *Handler) saveAudioURLIfNeeded(sessionID, contentText, audioURL string) {
+	if sessionID == "" || audioURL == "" || contentText == "" {
 		return
 	}
 	dir, err := h.sessionsDir()
@@ -381,5 +380,6 @@ func (h *Handler) saveAudioURLIfNeeded(sessionID string, msgIndex int, audioURL 
 	if err != nil {
 		return
 	}
-	_ = saveSessionAudioURL(dir, ref.Key, msgIndex, audioURL)
+	contentMD5 := fmt.Sprintf("%x", md5.Sum([]byte(contentText)))
+	_ = saveSessionAudioURL(dir, ref.Key, contentMD5, audioURL)
 }

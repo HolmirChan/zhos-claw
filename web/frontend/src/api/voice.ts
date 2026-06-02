@@ -27,14 +27,13 @@ export async function transcribeAudio(
 export async function synthesizeSpeech(
   text: string,
   sessionId?: string,
-  messageIndex?: number,
 ): Promise<{ audio_url: string }> {
   const res = await launcherFetch("/api/voice/synthesize", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       text,
-      ...(sessionId && messageIndex != null ? { session_id: sessionId, message_index: messageIndex } : {}),
+      ...(sessionId ? { session_id: sessionId } : {}),
     }),
     signal: AbortSignal.timeout(60_000),
   })
@@ -44,18 +43,6 @@ export async function synthesizeSpeech(
   }
 
   return res.json()
-}
-
-export async function saveSessionAudioURL(
-  sessionId: string,
-  messageIndex: number,
-  audioUrl: string,
-): Promise<void> {
-  await launcherFetch(`/api/sessions/${encodeURIComponent(sessionId)}/audio-url`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message_index: messageIndex, audio_url: audioUrl }),
-  })
 }
 
 export async function fetchVersionURLs(): Promise<{ http_url: string; https_url: string }> {
