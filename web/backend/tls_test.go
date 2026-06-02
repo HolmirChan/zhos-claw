@@ -4,6 +4,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"net"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -157,5 +159,133 @@ func TestClockFallback(t *testing.T) {
 	}
 	if fallback {
 		t.Error("normal clock should not produce fallback")
+	}
+}
+
+func ipStrs(ss ...string) []string { return ss }
+
+func TestMatchesCurrentIPsWith(t *testing.T) {
+	meta := &tlsMeta{
+		SchemaVersion: tlsSchemaVersion,
+		SANs:          ipStrs("127.0.0.1", "::1", "192.168.1.1"),
+	}
+	if !meta.matchesCurrentIPsWith(ipStrs("127.0.0.1", "::1", "192.168.1.1")) {
+		t.Error("equal sets should match")
+	}
+	if !meta.matchesCurrentIPsWith(ipStrs("127.0.0.1", "::1")) {
+		t.Error("subset should match")
+	}
+	if meta.matchesCurrentIPsWith(ipStrs("127.0.0.1", "::1", "192.168.1.1", "10.0.0.1")) {
+		t.Error("superset should not match")
+	}
+}
+
+func TestNeedsRegen(t *testing.T) {
+	metaOld := &tlsMeta{SchemaVersion: 0, SANs: ipStrs("127.0.0.1")}
+	if !metaOld.needsRegen() {
+		t.Error("schema version mismatch should trigger regen")
+	}
+	metaFallback := &tlsMeta{
+		SchemaVersion: tlsSchemaVersion,
+		SANs:          ipStrs("127.0.0.1", "::1"),
+		ClockFallback: true,
+	}
+	if !metaFallback.needsRegen() {
+		t.Error("clock_fallback should trigger regen when clock is normal")
+	}
+	ips := ipStrings(getAllLocalIPs())
+	metaOK := &tlsMeta{
+		SchemaVersion: tlsSchemaVersion,
+		SANs:          ips,
+		ClockFallback: false,
+	}
+	if metaOK.needsRegen() {
+		t.Error("matching meta should not trigger regen")
+	}
+}
+
+func TestSaveAndLoadTLSCache(t *testing.T) {
+	dir := t.TempDir()
+	certPEM := []byte("test-cert")
+	keyPEM := []byte("test-key")
+	meta := &tlsMeta{
+		SchemaVersion: tlsSchemaVersion,
+		SANs:          ipStrs("127.0.0.1", "::1"),
+		GeneratedAt:   "2026-06-02T10:00:00Z",
+	}
+
+	if err := saveTLSCache(dir, certPEM, keyPEM, meta); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	for _, name := range []string{"server.crt", "server.key", "meta.json"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("file %s not found: %v", name, err)
+		}
+	}
+
+	loadedMeta, loadedCert, loadedKey, err := loadTLSCache(dir)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if string(loadedCert) != string(certPEM) {
+		t.Error("cert mismatch")
+	}
+	if string(loadedKey) != string(keyPEM) {
+		t.Error("key mismatch")
+	}
+	if loadedMeta.SchemaVersion != meta.SchemaVersion {
+		t.Error("meta mismatch")
+	}
+}
+
+func TestLoadTLSCacheEmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	_, _, _, err := loadTLSCache(dir)
+	if err == nil {
+		t.Error("should error on empty dir")
+	}
+}
+
+func TestSaveTLSCacheCreatesDir(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "newsub")
+	certPEM := []byte("test")
+	keyPEM := []byte("test")
+	meta := &tlsMeta{SchemaVersion: tlsSchemaVersion}
+
+	if err := saveTLSCache(dir, certPEM, keyPEM, meta); err != nil {
+		t.Fatalf("save should create dir: %v", err)
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Error("directory should be created")
+	}
+}
+
+func TestFileWriteAtomic(t *testing.T) {
+	dir := t.TempDir()
+	certPEM := []byte("atomic-test-cert")
+	keyPEM := []byte("atomic-test-key")
+	meta := &tlsMeta{SchemaVersion: tlsSchemaVersion}
+
+	if err := saveTLSCache(dir, certPEM, keyPEM, meta); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) == ".tmp" {
+			t.Errorf("tmp file should not remain: %s", e.Name())
+		}
+	}
+
+	_, loadedCert, loadedKey, err := loadTLSCache(dir)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if string(loadedCert) != string(certPEM) {
+		t.Error("cert mismatch after atomic write")
+	}
+	if string(loadedKey) != string(keyPEM) {
+		t.Error("key mismatch after atomic write")
 	}
 }

@@ -6,10 +6,13 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"math/big"
 	"net"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/sipeed/picoclaw/pkg/logger"
@@ -135,4 +138,111 @@ func generateSelfSignedCert(ips []net.IP) (certPEM, keyPEM []byte, clockFallback
 	keyPEM = pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes})
 
 	return certPEM, keyPEM, clockFallback, nil
+}
+
+const tlsCacheDir = "tls"
+
+func tlsDir(home string) string {
+	return filepath.Join(home, tlsCacheDir)
+}
+
+func (m *tlsMeta) matchesCurrentIPs() bool {
+	return m.matchesCurrentIPsWith(ipStrings(getAllLocalIPs()))
+}
+
+func (m *tlsMeta) matchesCurrentIPsWith(current []string) bool {
+	cachedSet := make(map[string]struct{}, len(m.SANs))
+	for _, san := range m.SANs {
+		cachedSet[san] = struct{}{}
+	}
+	for _, ip := range current {
+		if _, ok := cachedSet[ip]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func (m *tlsMeta) needsRegen() bool {
+	if m.SchemaVersion != tlsSchemaVersion {
+		return true
+	}
+	if m.ClockFallback && time.Now().After(time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)) {
+		return true
+	}
+	if !m.matchesCurrentIPs() {
+		return true
+	}
+	return false
+}
+
+func loadTLSCache(dir string) (*tlsMeta, []byte, []byte, error) {
+	metaPath := filepath.Join(dir, "meta.json")
+	metaData, err := os.ReadFile(metaPath)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("read meta: %w", err)
+	}
+	var meta tlsMeta
+	if err := json.Unmarshal(metaData, &meta); err != nil {
+		return nil, nil, nil, fmt.Errorf("parse meta: %w", err)
+	}
+
+	certPath := filepath.Join(dir, "server.crt")
+	certPEM, err := os.ReadFile(certPath)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("read cert: %w", err)
+	}
+
+	keyPath := filepath.Join(dir, "server.key")
+	keyPEM, err := os.ReadFile(keyPath)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("read key: %w", err)
+	}
+
+	return &meta, certPEM, keyPEM, nil
+}
+
+func saveTLSCache(dir string, certPEM, keyPEM []byte, meta *tlsMeta) error {
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
+	}
+
+	unlock, err := lockFile(filepath.Join(dir, ".lock"))
+	if err != nil {
+		return fmt.Errorf("lock: %w", err)
+	}
+	defer unlock()
+
+	writeAndRename := func(name string, data []byte) error {
+		tmpPath := filepath.Join(dir, name+".tmp")
+		if err := os.WriteFile(tmpPath, data, 0600); err != nil {
+			return err
+		}
+		return os.Rename(tmpPath, filepath.Join(dir, name))
+	}
+
+	if err := writeAndRename("server.crt", certPEM); err != nil {
+		return fmt.Errorf("write cert: %w", err)
+	}
+	if err := writeAndRename("server.key", keyPEM); err != nil {
+		return fmt.Errorf("write key: %w", err)
+	}
+
+	metaData, err := json.Marshal(meta)
+	if err != nil {
+		return fmt.Errorf("marshal meta: %w", err)
+	}
+	if err := writeAndRename("meta.json", metaData); err != nil {
+		return fmt.Errorf("write meta: %w", err)
+	}
+
+	return nil
+}
+
+func ipStrings(ips []net.IP) []string {
+	s := make([]string, len(ips))
+	for i, ip := range ips {
+		s[i] = ip.String()
+	}
+	return s
 }
