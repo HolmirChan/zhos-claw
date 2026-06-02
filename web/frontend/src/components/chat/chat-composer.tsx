@@ -1,5 +1,5 @@
 import { IconArrowUp, IconPhotoPlus, IconX } from "@tabler/icons-react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import type { KeyboardEvent } from "react"
 import { useTranslation } from "react-i18next"
 import TextareaAutosize from "react-textarea-autosize"
@@ -12,7 +12,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-import { fetchVersionURLs } from "@/api/voice"
 import { useVoice } from "@/hooks/use-voice"
 import { VoiceRecorder } from "./voice-recorder"
 import type { ChatAttachment, ContextUsage } from "@/store/chat"
@@ -57,21 +56,7 @@ export function ChatComposer({
   const { t } = useTranslation()
   const { outputEnabled, ttsAvailable, streamingAvailable, toggleOutput } = useVoice()
   const [showRecorder, setShowRecorder] = useState(false)
-  const [httpsUrl, setHttpsUrl] = useState("")
-  const [httpsUrlLoaded, setHttpsUrlLoaded] = useState(false)
   const isSecure = typeof window !== "undefined" && window.isSecureContext
-
-  useEffect(() => {
-    if (!isSecure) {
-      fetchVersionURLs().then((urls) => {
-        setHttpsUrl(urls.https_url || `https://${location.hostname}:18443`)
-        setHttpsUrlLoaded(true)
-      }).catch(() => {
-        setHttpsUrl(`https://${location.hostname}:18443`)
-        setHttpsUrlLoaded(true)
-      })
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const canInput = inputDisabledReason === null
   const disabledMessage =
     inputDisabledReason === null
@@ -188,12 +173,12 @@ export function ChatComposer({
                 size="icon"
                 className="text-muted-foreground hover:text-foreground h-8 w-8 rounded-full"
                 onClick={() => {
-                  const url = httpsUrl || `https://${location.hostname}:18443`
+                  const url = `https://${location.hostname}:18443`
                   if (window.confirm("语音录音需要通过 HTTPS 连接。是否跳转到 HTTPS 地址？")) {
                     window.location.href = url
                   }
                 }}
-                title={httpsUrlLoaded ? `点击跳转到 HTTPS：${httpsUrl}` : "语音录音需通过 HTTPS 访问"}
+                title="点击跳转到语音录音页面"
               >
                 <span className="text-base">🎤</span>
               </Button>
