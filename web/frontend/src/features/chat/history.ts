@@ -50,6 +50,7 @@ export async function loadSessionMessages(
     role: message.role,
     content: message.content,
     kind: message.role === "assistant" ? (message.kind ?? "normal") : undefined,
+    audio_url: message.audio_url,
     toolCalls:
       message.role === "assistant"
         ? parseToolCallsValue(message.tool_calls)
