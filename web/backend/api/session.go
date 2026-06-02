@@ -26,6 +26,7 @@ func (h *Handler) registerSessionRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/sessions", h.handleListSessions)
 	mux.HandleFunc("GET /api/sessions/{id}", h.handleGetSession)
 	mux.HandleFunc("DELETE /api/sessions/{id}", h.handleDeleteSession)
+	mux.HandleFunc("POST /api/sessions/{id}/audio-url", h.handleSaveSessionAudioURL)
 }
 
 // sessionFile mirrors the on-disk session JSON structure from pkg/session.
@@ -54,6 +55,7 @@ type sessionChatMessage struct {
 	Media       []string                `json:"media,omitempty"`
 	Attachments []sessionChatAttachment `json:"attachments,omitempty"`
 	ToolCalls   []utils.VisibleToolCall `json:"tool_calls,omitempty"`
+	AudioURL    string                  `json:"audio_url,omitempty"`
 }
 
 type sessionChatAttachment struct {
@@ -921,6 +923,16 @@ func (h *Handler) handleGetSession(w http.ResponseWriter, r *http.Request) {
 
 	messages := detailSessionMessages(sess.Messages, toolFeedbackMaxArgsLength)
 
+		if refErr == nil {
+			if audioURLs, loadErr := loadSessionAudioURLs(dir, ref.Key); loadErr == nil && len(audioURLs) > 0 {
+				for i := range messages {
+					if url, ok := audioURLs[i]; ok {
+						messages[i].AudioURL = url
+					}
+				}
+			}
+		}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"id":       sessionID,
@@ -929,6 +941,96 @@ func (h *Handler) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		"created":  sess.Created.Format(time.RFC3339),
 		"updated":  sess.Updated.Format(time.RFC3339),
 	})
+}
+
+// sessionAudioURLsFile returns the path to the per-session audio_urls.json sidecar.
+func sessionAudioURLsFile(dir, sessionKey string) string {
+	return filepath.Join(dir, sanitizeSessionKey(sessionKey)+".audio_urls.json")
+}
+
+// loadSessionAudioURLs reads the audio_urls.json sidecar for a session.
+func loadSessionAudioURLs(dir, sessionKey string) (map[int]string, error) {
+	path := sessionAudioURLsFile(dir, sessionKey)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var m map[int]string
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// saveSessionAudioURL writes a message index → audio_url mapping to audio_urls.json.
+func saveSessionAudioURL(dir, sessionKey string, msgIndex int, audioURL string) error {
+	m, err := loadSessionAudioURLs(dir, sessionKey)
+	if err != nil {
+		m = make(map[int]string)
+	}
+	m[msgIndex] = audioURL
+	data, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(sessionAudioURLsFile(dir, sessionKey), data, 0600)
+}
+
+// cleanSessionAudioFiles deletes all TTS audio files referenced by a session's audio_urls.json.
+func cleanSessionAudioFiles(dir, sessionKey string) {
+	m, err := loadSessionAudioURLs(dir, sessionKey)
+	if err != nil || len(m) == 0 {
+		return
+	}
+	cacheDir := filepath.Join(config.GetHome(), "tts-cache")
+	for _, url := range m {
+		fileID := filepath.Base(url)
+		if fileID == "" || fileID == "." || fileID == ".." {
+			continue
+		}
+		os.Remove(filepath.Join(cacheDir, fileID))
+	}
+}
+
+// handleSaveSessionAudioURL saves an audio_url for a session message.
+//
+//	POST /api/sessions/{id}/audio-url
+func (h *Handler) handleSaveSessionAudioURL(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	if sessionID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing session id"})
+		return
+	}
+	var req struct {
+		MessageIndex int    `json:"message_index"`
+		AudioURL     string `json:"audio_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+	if req.AudioURL == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing audio_url"})
+		return
+	}
+	dir, err := h.sessionsDir()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "sessions dir"})
+		return
+	}
+	ref, err := h.findPicoJSONLSession(dir, sessionID)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "session not found"})
+		return
+	}
+	if err := saveSessionAudioURL(dir, ref.Key, req.MessageIndex, req.AudioURL); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "save failed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // handleDeleteSession deletes a specific session.
@@ -949,6 +1051,8 @@ func (h *Handler) handleDeleteSession(w http.ResponseWriter, r *http.Request) {
 
 	removed := false
 	if ref, err := h.findPicoJSONLSession(dir, sessionID); err == nil {
+		cleanSessionAudioFiles(dir, ref.Key)
+		os.Remove(sessionAudioURLsFile(dir, ref.Key))
 		base := filepath.Join(dir, sanitizeSessionKey(ref.Key))
 		for _, path := range []string{base + ".jsonl", base + ".meta.json"} {
 			if err := os.Remove(path); err != nil {

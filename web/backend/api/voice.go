@@ -1,7 +1,9 @@
 package api
 
 import (
+	"crypto/md5"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -102,7 +104,9 @@ func (h *Handler) handleVoiceTranscribe(w http.ResponseWriter, r *http.Request) 
 //	POST /api/voice/synthesize
 func (h *Handler) handleVoiceSynthesize(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Text string `json:"text"`
+		Text         string `json:"text"`
+		SessionID    string `json:"session_id,omitempty"`
+		MessageIndex int    `json:"message_index,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Text == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺少 text 参数"})
@@ -129,6 +133,19 @@ func (h *Handler) handleVoiceSynthesize(w http.ResponseWriter, r *http.Request) 
 
 	cleanTTSCache(cacheDir, time.Hour)
 
+	// Deterministic filename: tts-<md5(text)>.mp3
+	hash := md5.Sum([]byte(req.Text))
+	fileName := fmt.Sprintf("tts-%x.mp3", hash)
+	filePath := filepath.Join(cacheDir, fileName)
+
+	// If cached file exists, skip synthesis
+	if _, statErr := os.Stat(filePath); statErr == nil {
+		audioURL := "/api/voice/audio/" + fileName
+		h.saveAudioURLIfNeeded(req.SessionID, req.MessageIndex, audioURL)
+		writeJSON(w, http.StatusOK, map[string]string{"audio_url": audioURL})
+		return
+	}
+
 	audioStream, err := provider.Synthesize(r.Context(), req.Text)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "TTS 合成失败"})
@@ -136,12 +153,7 @@ func (h *Handler) handleVoiceSynthesize(w http.ResponseWriter, r *http.Request) 
 	}
 	defer audioStream.Close()
 
-	ext := ".mp3"
-	if provider.Name() == "mimo-tts" {
-		ext = ".mp3"
-	}
-
-	tmp, err := os.CreateTemp(cacheDir, "tts-*"+ext)
+	tmp, err := os.CreateTemp(cacheDir, "tts-*.mp3")
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "创建缓存文件失败"})
 		return
@@ -155,9 +167,16 @@ func (h *Handler) handleVoiceSynthesize(w http.ResponseWriter, r *http.Request) 
 	}
 	tmp.Close()
 
-	writeJSON(w, http.StatusOK, map[string]string{
-		"audio_url": "/api/voice/audio/" + filepath.Base(tmp.Name()),
-	})
+	// Rename to deterministic filename
+	if err := os.Rename(tmp.Name(), filePath); err != nil {
+		// Fallback: keep temp name
+		fileName = filepath.Base(tmp.Name())
+	}
+
+	audioURL := "/api/voice/audio/" + fileName
+	h.saveAudioURLIfNeeded(req.SessionID, req.MessageIndex, audioURL)
+
+	writeJSON(w, http.StatusOK, map[string]string{"audio_url": audioURL})
 }
 
 // handleVoiceAudio serves a cached TTS audio file.
@@ -347,4 +366,20 @@ func (h *Handler) handleVoiceStream(w http.ResponseWriter, r *http.Request) {
 func writeWSJSON(conn *websocket.Conn, v any) {
 	data, _ := json.Marshal(v)
 	conn.WriteMessage(websocket.TextMessage, data)
+}
+
+// saveAudioURLIfNeeded persists the audio_url mapping for a session message.
+func (h *Handler) saveAudioURLIfNeeded(sessionID string, msgIndex int, audioURL string) {
+	if sessionID == "" || audioURL == "" {
+		return
+	}
+	dir, err := h.sessionsDir()
+	if err != nil {
+		return
+	}
+	ref, err := h.findPicoJSONLSession(dir, sessionID)
+	if err != nil {
+		return
+	}
+	_ = saveSessionAudioURL(dir, ref.Key, msgIndex, audioURL)
 }

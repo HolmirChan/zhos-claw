@@ -362,7 +362,7 @@ export function ChatPage() {
             />
           )}
 
-          {messages.map((msg) => {
+          {messages.map((msg, msgIndex) => {
             if (
               !shouldShowAssistantMessage(assistantDetailVisibility, msg.kind)
             ) {
@@ -379,6 +379,9 @@ export function ChatPage() {
                     toolCalls={msg.toolCalls}
                     timestamp={msg.timestamp}
                     isComplete={!isTyping}
+                    audioUrl={msg.audio_url}
+                    sessionId={activeSessionId}
+                    msgIndex={msgIndex}
                   />
                 ) : (
                   <UserMessage

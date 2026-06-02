@@ -41,6 +41,9 @@ interface AssistantMessageProps {
   toolCalls?: ChatToolCall[]
   timestamp?: string | number
   isComplete?: boolean
+  audioUrl?: string
+  sessionId?: string
+  msgIndex?: number
 }
 
 export function AssistantMessage({
@@ -50,6 +53,9 @@ export function AssistantMessage({
   toolCalls = [],
   timestamp = "",
   isComplete = false,
+  audioUrl: propAudioUrl,
+  sessionId,
+  msgIndex,
 }: AssistantMessageProps) {
   const { t } = useTranslation()
   const { copy, isCopied } = useCopyToClipboard()
@@ -76,8 +82,17 @@ export function AssistantMessage({
 
   const outputEnabled = useAtomValue(voiceOutputAtom)
   const [ttsLoading, setTtsLoading] = useState(false)
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [audioUrl, setAudioUrl] = useState<string | null>(propAudioUrl || null)
+  const [audioError, setAudioError] = useState(false)
   const ttsTriggeredRef = useRef(false)
+
+  // Sync from prop when it arrives (e.g., after session load)
+  useEffect(() => {
+    if (propAudioUrl) {
+      setAudioUrl(propAudioUrl)
+      setAudioError(false)
+    }
+  }, [propAudioUrl])
 
   useEffect(() => {
     if (!isComplete || !content?.trim()) return
@@ -85,12 +100,14 @@ export function AssistantMessage({
     if (ttsTriggeredRef.current) return
     ttsTriggeredRef.current = true
 
+    if (audioUrl) return // already have URL from session
+
     if (!outputEnabled) return
 
     let cancelled = false
 
     setTtsLoading(true)
-    synthesizeSpeech(content)
+    synthesizeSpeech(content, sessionId, msgIndex)
       .then((res) => {
         if (!cancelled) setAudioUrl(res.audio_url)
       })
@@ -254,8 +271,19 @@ export function AssistantMessage({
               {/* AudioPlayer: mutual exclusion — either loading spinner OR play button, always visible */}
               {ttsLoading ? (
                 <AudioPlayer />
-              ) : audioUrl ? (
-                <AudioPlayer audioUrl={audioUrl} />
+              ) : audioUrl && !audioError ? (
+                <AudioPlayer
+                  audioUrl={audioUrl}
+                  onError={() => {
+                    setAudioError(true)
+                    if (sessionId != null && msgIndex != null) {
+                      synthesizeSpeech(content, sessionId, msgIndex).then((res) => {
+                        setAudioUrl(res.audio_url)
+                        setAudioError(false)
+                      }).catch(() => {})
+                    }
+                  }}
+                />
               ) : null}
 
               {/* Copy button: hover-only */}

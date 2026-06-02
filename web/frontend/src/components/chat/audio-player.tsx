@@ -1,18 +1,33 @@
 import { useRef, useState } from "react";
 
 interface AudioPlayerProps {
-  audioUrl?: string; // undefined = loading state → show spinner
+  audioUrl?: string;
+  onError?: () => void;
 }
 
-export function AudioPlayer({ audioUrl }: AudioPlayerProps) {
+export function AudioPlayer({ audioUrl, onError }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [error, setError] = useState(false);
 
   if (!audioUrl) {
     return (
       <span className="inline-flex h-6 w-6 items-center justify-center" title="正在生成语音...">
         <span className="block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60" />
       </span>
+    );
+  }
+
+  if (error) {
+    return (
+      <button
+        type="button"
+        onClick={() => { setError(false); onError?.(); }}
+        className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors"
+        title="音频不可用，点击重新生成"
+      >
+        🔄
+      </button>
     );
   }
 
@@ -37,6 +52,7 @@ export function AudioPlayer({ audioUrl }: AudioPlayerProps) {
         onEnded={() => setPlaying(false)}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
+        onError={() => setError(true)}
         autoPlay
       />
     </span>

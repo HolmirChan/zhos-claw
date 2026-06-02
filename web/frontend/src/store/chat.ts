@@ -43,6 +43,7 @@ export interface ChatMessage {
   role: "user" | "assistant"
   content: string
   timestamp: number | string
+  audio_url?: string
   kind?: AssistantMessageKind
   attachments?: ChatAttachment[]
   toolCalls?: ChatToolCall[]
