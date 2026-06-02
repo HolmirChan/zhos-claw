@@ -289,3 +289,59 @@ func TestFileWriteAtomic(t *testing.T) {
 		t.Error("key mismatch after atomic write")
 	}
 }
+
+func TestHTTPSNotStartedWithoutPublic(t *testing.T) {
+	if shouldStartTLS(false, false) {
+		t.Error("TLS should not start without -public")
+	}
+}
+
+func TestHTTPSNotStartedWhenDisabled(t *testing.T) {
+	if shouldStartTLS(true, true) {
+		t.Error("TLS should not start with -no-tls")
+	}
+}
+
+func TestTLSPortEqualsHTTPPort(t *testing.T) {
+	if err := validateTLSPort(18800, 18800); err == nil {
+		t.Error("same port should error")
+	}
+}
+
+func TestClockFallbackPersisted(t *testing.T) {
+	meta := &tlsMeta{
+		SchemaVersion: tlsSchemaVersion,
+		SANs:          ipStrs("127.0.0.1", "::1"),
+		ClockFallback: true,
+	}
+	if !meta.needsRegen() {
+		t.Error("clock_fallback meta should trigger regen when clock is normal")
+	}
+}
+
+func TestConcurrentSaveTLSCache(t *testing.T) {
+	dir := t.TempDir()
+
+	done := make(chan error, 5)
+	for i := 0; i < 5; i++ {
+		go func() {
+			certPEM, keyPEM, fallback, _ := generateSelfSignedCert(nil)
+			meta := &tlsMeta{
+				SchemaVersion: tlsSchemaVersion,
+				SANs:          ipStrs("127.0.0.1", "::1"),
+			}
+			_ = fallback
+			done <- saveTLSCache(dir, certPEM, keyPEM, meta)
+		}()
+	}
+	for i := 0; i < 5; i++ {
+		if err := <-done; err != nil {
+			t.Errorf("concurrent save: %v", err)
+		}
+	}
+
+	_, _, _, err := loadTLSCache(dir)
+	if err != nil {
+		t.Fatalf("concurrent writes should leave valid cache: %v", err)
+	}
+}

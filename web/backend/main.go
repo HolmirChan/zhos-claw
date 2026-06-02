@@ -346,6 +346,8 @@ func main() {
 	noBrowser = flag.Bool("no-browser", false, "Do not auto-open browser on startup")
 	lang := flag.String("lang", "", "Language: en (English) or zh (Chinese). Default: auto-detect from system locale")
 	console := flag.Bool("console", false, "Console mode, no GUI")
+	noTLS := flag.Bool("no-tls", false, "Disable HTTPS (even when -public is set)")
+	tlsPort := flag.String("tls-port", "18443", "HTTPS port to listen on")
 
 	var debug bool
 	flag.BoolVar(&debug, "d", false, "Enable debug logging")
@@ -377,6 +379,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "      Bind launcher host explicitly with exact host semantics\n")
 		fmt.Fprintf(os.Stderr, "  %s -console -d ./config.json\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "      Run in the terminal with debug logs enabled\n")
+		fmt.Fprintf(os.Stderr, "  %s -public -tls-port 18443 ./config.json\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "      Start with HTTPS on port 18443\n")
 	}
 	flag.Parse()
 
@@ -503,6 +507,14 @@ func main() {
 		logger.Fatalf("Invalid port %q: %v", effectivePort, err)
 	}
 
+	tlsPortNum, err := strconv.Atoi(*tlsPort)
+	if err != nil || tlsPortNum < 1 || tlsPortNum > 65535 {
+		if err == nil {
+			err = errors.New("must be in range 1-65535")
+		}
+		logger.Fatalf("Invalid TLS port %q: %v", *tlsPort, err)
+	}
+
 	openResult, err := openLauncherListeners(hostInput, effectivePublic, effectivePort)
 	if err != nil {
 		logger.Fatalf("Failed to open launcher listener(s): %v", err)
@@ -614,6 +626,42 @@ func main() {
 		),
 	)
 
+	var tlsListeners []net.Listener
+	var httpsAddr string // set in Task 6
+	_ = httpsAddr
+	if shouldStartTLS(effectivePublic, *noTLS) {
+		if err := validateTLSPort(portNum, tlsPortNum); err != nil {
+			logger.Fatalf("TLS 配置错误: %v", err)
+		}
+		tlsResult, tlsCfg, tlsErr := ensureTLS(hostInput, effectivePublic, *tlsPort, picoHome)
+		if tlsErr != nil {
+			logger.ErrorC("web", fmt.Sprintf("HTTPS 启动失败，仅 HTTP 可用: %v", tlsErr))
+		} else {
+			tlsListeners = tlsResult.Listeners
+			httpsHost := openResult.ProbeHost
+			if hasWildcardBindHosts(tlsResult.BindHosts) {
+				if ip := advertiseIPForWildcardBindHosts(tlsResult.BindHosts); ip != "" {
+					httpsHost = ip
+				}
+			}
+			httpsAddr = fmt.Sprintf("https://%s", net.JoinHostPort(httpsHost, *tlsPort))
+
+			for _, ln := range tlsResult.Listeners {
+				tlsSrv := &http.Server{
+					Handler:   handler,
+					TLSConfig: tlsCfg,
+				}
+				servers = append(servers, tlsSrv)
+				go func(s *http.Server, l net.Listener) {
+					logger.InfoC("web", fmt.Sprintf("HTTPS 监听: https://%s", l.Addr().String()))
+					if serveErr := s.ServeTLS(l, "", ""); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+						logger.Fatalf("HTTPS server failed on %s: %v", l.Addr().String(), serveErr)
+					}
+				}(tlsSrv, ln)
+			}
+		}
+	}
+
 	// Print startup banner (console mode only).
 	if enableConsole || debug {
 		consoleHosts := launcherConsoleHosts(hostInput, effectivePublic)
@@ -633,6 +681,15 @@ func main() {
 		for _, host := range consoleHosts {
 			fmt.Printf("    >> http://%s <<\n", net.JoinHostPort(host, effectivePort))
 		}
+		if len(tlsListeners) > 0 {
+			fmt.Println()
+			fmt.Println("  HTTPS (语音功能):")
+			fmt.Println()
+			for _, h := range consoleHosts {
+				fmt.Printf("    >> https://%s <<\n", net.JoinHostPort(h, *tlsPort))
+			}
+			fmt.Println()
+		}
 		fmt.Println()
 	}
 
@@ -643,6 +700,14 @@ func main() {
 	if hasWildcardBindHosts(openResult.BindHosts) {
 		if ip := advertiseIPForWildcardBindHosts(openResult.BindHosts); ip != "" {
 			logger.InfoC("web", fmt.Sprintf("Public access enabled at http://%s", net.JoinHostPort(ip, effectivePort)))
+	if len(tlsListeners) > 0 {
+		for _, ln := range tlsListeners {
+			logger.InfoC("web", fmt.Sprintf("HTTPS 监听: https://%s", ln.Addr().String()))
+		}
+		if ip := advertiseIPForWildcardBindHosts(openResult.BindHosts); ip != "" {
+			logger.InfoC("web", fmt.Sprintf("Public access enabled at https://%s", net.JoinHostPort(ip, *tlsPort)))
+		}
+	}
 		}
 	}
 

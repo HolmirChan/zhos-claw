@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
@@ -13,9 +14,11 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/sipeed/picoclaw/pkg/logger"
+	"github.com/sipeed/picoclaw/pkg/netbind"
 )
 
 type tlsMeta struct {
@@ -245,4 +248,63 @@ func ipStrings(ips []net.IP) []string {
 		s[i] = ip.String()
 	}
 	return s
+}
+
+func ensureTLS(hostInput string, effectivePublic bool, tlsPort string, home string) (netbind.OpenResult, *tls.Config, error) {
+	dir := tlsDir(home)
+
+	meta, certPEM, keyPEM, loadErr := loadTLSCache(dir)
+	if loadErr != nil || meta.needsRegen() {
+		if loadErr != nil {
+			logger.InfoC("web", "TLS 缓存不存在或损坏，生成新证书")
+		} else if meta.needsRegen() {
+			logger.InfoC("web", "TLS 证书需更新（IP 变化/时钟同步/schema 升级），重新生成")
+		}
+
+		ips := getAllLocalIPs()
+		var fallback bool
+		var genErr error
+		certPEM, keyPEM, fallback, genErr = generateSelfSignedCert(ips)
+		if genErr != nil {
+			return netbind.OpenResult{}, nil, fmt.Errorf("生成 TLS 证书失败: %w", genErr)
+		}
+
+		meta = &tlsMeta{
+			SchemaVersion: tlsSchemaVersion,
+			SANs:          ipStrings(ips),
+			ClockFallback: fallback,
+			GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
+		}
+
+		if err := saveTLSCache(dir, certPEM, keyPEM, meta); err != nil {
+			return netbind.OpenResult{}, nil, fmt.Errorf("保存 TLS 缓存失败: %w", err)
+		}
+
+		logger.InfoC("web", "TLS 证书已生成并写入缓存")
+	}
+
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		return netbind.OpenResult{}, nil, fmt.Errorf("解析 TLS 密钥对失败: %w", err)
+	}
+
+	tlsCfg := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+	}
+
+	defaultMode := netbind.DefaultLoopback
+	if effectivePublic && strings.TrimSpace(hostInput) == "" {
+		defaultMode = netbind.DefaultAny
+	}
+	plan, planErr := netbind.BuildPlan(hostInput, defaultMode)
+	if planErr != nil {
+		return netbind.OpenResult{}, nil, fmt.Errorf("构建 TLS 绑定计划失败: %w", planErr)
+	}
+	result, openErr := netbind.OpenPlan(plan, tlsPort)
+	if openErr != nil {
+		return netbind.OpenResult{}, nil, fmt.Errorf("HTTPS 端口 %s 绑定失败: %w", tlsPort, openErr)
+	}
+
+	return result, tlsCfg, nil
 }
