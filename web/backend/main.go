@@ -637,7 +637,7 @@ func main() {
 			logger.ErrorC("web", fmt.Sprintf("HTTPS 启动失败，仅 HTTP 可用: %v", tlsErr))
 		} else {
 			tlsListeners = tlsResult.Listeners
-			httpsAddr = fmt.Sprintf("https://%s", net.JoinHostPort(openResult.ProbeHost, *tlsPort))
+			httpsAddr = fmt.Sprintf("https://%s", net.JoinHostPort(firstNonEmpty(utils.GetLocalIPv4(), openResult.ProbeHost), *tlsPort))
 
 			for _, ln := range tlsResult.Listeners {
 				tlsSrv := &http.Server{
