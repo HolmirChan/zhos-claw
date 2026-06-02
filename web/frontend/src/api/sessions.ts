@@ -15,6 +15,7 @@ export interface SessionDetail {
     role: "user" | "assistant"
     content: string
     kind?: "normal" | "thought" | "tool_calls"
+    audio_url?: string
     media?: string[]
     attachments?: {
       type?: "image" | "audio" | "video" | "file"
