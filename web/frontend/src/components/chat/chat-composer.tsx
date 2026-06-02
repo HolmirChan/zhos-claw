@@ -186,11 +186,16 @@ export function ChatComposer({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="text-muted-foreground h-8 w-8 rounded-full"
-                disabled
-                title={httpsUrlLoaded ? `语音录音需通过 HTTPS 访问。请访问 ${httpsUrl}` : "语音录音需通过 HTTPS 访问"}
+                className="text-muted-foreground hover:text-foreground h-8 w-8 rounded-full"
+                onClick={() => {
+                  const url = httpsUrl || `https://${location.hostname}:18443`
+                  if (window.confirm("语音录音需要通过 HTTPS 连接。是否跳转到 HTTPS 地址？")) {
+                    window.location.href = url
+                  }
+                }}
+                title={httpsUrlLoaded ? `点击跳转到 HTTPS：${httpsUrl}` : "语音录音需通过 HTTPS 访问"}
               >
-                <span className="text-base">🔇</span>
+                <span className="text-base">🎤</span>
               </Button>
             ) : null}
             {ttsAvailable && (

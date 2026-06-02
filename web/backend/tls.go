@@ -117,7 +117,7 @@ func generateSelfSignedCert(ips []net.IP) (certPEM, keyPEM []byte, clockFallback
 
 	template := &x509.Certificate{
 		SerialNumber:            serial,
-		Subject:                 pkix.Name{CommonName: "ZhosClaw TLS"},
+		Subject:                 pkix.Name{CommonName: "ZaiAgent TLS by OpenValley"},
 		NotBefore:               notBefore,
 		NotAfter:                notAfter,
 		KeyUsage:                x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
