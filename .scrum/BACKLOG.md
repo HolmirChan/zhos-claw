@@ -1,20 +1,50 @@
 # Backlog
 
-> 当前迭代: sprint_006
+> 当前迭代: sprint_007
 
 ## 待规划
+
+### BL-010 · Launcher TLS 支持 + 自签名证书自动签发
+- **意图**: Launcher 启动时自动生成自签名证书，启用 HTTPS 端口（18443），解决 RK3506 设备 HTTP 非 localhost 下浏览器阻止 getUserMedia/AudioWorklet 导致语音录音不可用的问题
+- **方案方向**: Go `crypto/tls` + `crypto/x509` 标准库在启动时自动生成 ECDSA P256 自签名证书，SAN 绑定设备 IP，缓存到 `<home>/tls/`；双端口并存（HTTP 18800 + HTTPS 18443）；前端 VoiceRecorder 补 `isSecureContext` 检测
+- **设计文档**: .scrum/specs/2026-06-02-launcher-tls-design.md
+- **实现计划**: .scrum/plans/2026-06-02-launcher-tls.md
+- **验收标准**:
+  - [ ] `-public` 开启时自动生成自签名证书，缓存到 `<home>/tls/`
+  - [ ] `-public=false` 时不启动 HTTPS，不生成证书
+  - [ ] `-no-tls` 显式关闭 HTTPS
+  - [ ] `-tls-port == -port` 启动直接 fatal
+  - [ ] HTTPS 端口 18443（可通过 `-tls-port` 修改）
+  - [ ] HTTP 和 HTTPS 共用 netbind.Plan，双端口行为一致
+  - [ ] 设备 IP 集合未变时，启动 5 次仍使用同一证书
+  - [ ] 设备新增 LAN IPv4 时证书自动重新生成
+  - [ ] link-local / IPv6 GUA/ULA 变化不触发重生成
+  - [ ] 时钟未同步（RTC < 2020）时生成 NotAfter ≥ 2099 的 fallback 证书
+  - [ ] NTP 同步后重启，检测 clock_fallback → 自动替换为正常证书
+  - [ ] 多网卡设备从任一 LAN IP 访问 HTTPS 不报 hostname mismatch
+  - [ ] 18443 被占用时打印明确错误，不静默失败
+  - [ ] HTTPS server 参与 graceful shutdown
+  - [ ] `/api/system/version` 包含 `https_url` 字段
+  - [ ] 前端非安全上下文显示 disabled 麦克风 + 从 `/api/system/version` 读取端口
+  - [ ] 前端无硬编码 `http://` 自引用导致 mixed-content
+  - [ ] 浏览器访问 `https://IP:18443` 录音功能正常工作
+  - [ ] 控制台和文件日志同时打印 HTTPS 入口地址
+  - [ ] 部署脚本无需额外证书推送步骤
+
+## 已交付
 
 ### BL-009 · 流式语音识别 + 播放交互优化
 - **意图**: ASR 从「录完上传→一次性返回」升级为实时流式识别（边说边出字），对接火山引擎 WebSocket 协议；TTS 播放按钮从气泡底部行内移到右上角与复制按钮并排
 - **方案方向**: 后端新增 `pkg/audio/asr/streaming.go` 流式接口 + 火山引擎 WebSocket 实现 + `GET /api/voice/stream` WebSocket 端点；前端 VoiceRecorder 改用 AudioContext 采集 PCM、WebSocket 推送音频块、流式更新输入框；AudioPlayer 移入 assistant-message 右上角
 - **设计文档**: .scrum/specs/2026-06-01-streaming-asr-design.md
 - **实现计划**: .scrum/plans/2026-06-01-streaming-asr.md
+- **已完成于**: sprint_006.md
 - **验收标准**:
-  - [ ] 点🎤立即录音，按钮脉冲动画 + 计时，说话时输入框实时出字
-  - [ ] 点发送/Enter 停止录音并发送；再点🎤停止录音文字留输入框
-  - [ ] 60s 自动停止
-  - [ ] HTTP `/api/voice/transcribe`（SiliconFlow）并行可用
-  - [ ] TTS 播放按钮在消息气泡右上角，与复制按钮并排
+  - [x] 点🎤立即录音，按钮脉冲动画 + 计时，说话时输入框实时出字
+  - [x] 点发送/Enter 停止录音并发送；再点🎤停止录音文字留输入框
+  - [x] 60s 自动停止
+  - [x] HTTP `/api/voice/transcribe`（SiliconFlow）并行可用
+  - [x] TTS 播放按钮在消息气泡右上角，与复制按钮并排
 
 ## 已交付
 
