@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/x509"
+	"encoding/pem"
 	"net"
 	"testing"
 )
@@ -76,5 +78,84 @@ func TestGetAllLocalIPs(t *testing.T) {
 	}
 	if !foundV6Loopback {
 		t.Error("::1 must always be present")
+	}
+}
+
+func TestGenerateSelfSignedCert(t *testing.T) {
+	ips := []net.IP{net.ParseIP("192.168.1.1")}
+	certPEM, keyPEM, fallback, err := generateSelfSignedCert(ips)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if fallback {
+		t.Error("should not be fallback with normal clock")
+	}
+	if len(certPEM) == 0 || len(keyPEM) == 0 {
+		t.Fatal("empty output")
+	}
+
+	block, _ := pem.Decode(certPEM)
+	if block == nil || block.Type != "CERTIFICATE" {
+		t.Fatal("not a valid PEM certificate")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatalf("parse cert: %v", err)
+	}
+	if !cert.NotAfter.After(cert.NotBefore) {
+		t.Error("NotAfter must be after NotBefore")
+	}
+
+	foundV4 := false
+	for _, ip := range cert.IPAddresses {
+		if ip.Equal(net.IPv4(127, 0, 0, 1)) {
+			foundV4 = true
+		}
+	}
+	if !foundV4 {
+		t.Error("127.0.0.1 must be in SAN")
+	}
+
+	keyBlock, _ := pem.Decode(keyPEM)
+	if keyBlock == nil || keyBlock.Type != "EC PRIVATE KEY" {
+		t.Fatal("not a valid EC private key")
+	}
+}
+
+func TestGenerateSelfSignedCertMultipleIPs(t *testing.T) {
+	ips := []net.IP{
+		net.ParseIP("192.168.1.1"),
+		net.ParseIP("10.0.0.1"),
+	}
+	certPEM, _, _, err := generateSelfSignedCert(ips)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	block, _ := pem.Decode(certPEM)
+	cert, _ := x509.ParseCertificate(block.Bytes)
+	if len(cert.IPAddresses) < 4 {
+		t.Errorf("expected >= 4 IPs in SAN, got %d", len(cert.IPAddresses))
+	}
+}
+
+func TestGenerateSelfSignedCertEmptyIPs(t *testing.T) {
+	certPEM, _, _, err := generateSelfSignedCert(nil)
+	if err != nil {
+		t.Fatalf("generate with nil IPs: %v", err)
+	}
+	block, _ := pem.Decode(certPEM)
+	cert, _ := x509.ParseCertificate(block.Bytes)
+	if len(cert.IPAddresses) < 2 {
+		t.Errorf("expected >= 2 IPs (loopback), got %d", len(cert.IPAddresses))
+	}
+}
+
+func TestClockFallback(t *testing.T) {
+	_, _, fallback, err := generateSelfSignedCert(nil)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if fallback {
+		t.Error("normal clock should not produce fallback")
 	}
 }
