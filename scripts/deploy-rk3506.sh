@@ -73,4 +73,6 @@ echo "==> Starting services..."
 ${HDC} shell "/etc/init.d/${INIT_NAME}"
 
 echo ""
-echo "部署完成！访问 http://${DEVICE_IP}:18800"
+echo "部署完成！"
+echo "  HTTP:  http://${DEVICE_IP}:18800"
+echo "  HTTPS: https://${DEVICE_IP}:18443  (语音功能)"
