@@ -128,7 +128,3 @@
   - [x] 60s 自动停止
   - [x] HTTP `/api/voice/transcribe`（SiliconFlow）并行可用
   - [x] TTS 播放按钮在消息气泡右上角，与复制按钮并排
-
-
-## 待规划
-（空）
