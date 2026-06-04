@@ -32,6 +32,8 @@ func ValidatePathWithAllowPaths(
 	return validatePathWithAllowPaths(path, workspace, restrict, patterns)
 }
 
+var ErrWorkspaceBoundary = errors.New("workspace boundary")
+
 func IsAllowedPath(path string, patterns []*regexp.Regexp) bool {
 	return isAllowedPath(path, patterns)
 }
@@ -66,7 +68,7 @@ func validatePathWithAllowPaths(
 		}
 
 		if !isWithinWorkspace(absPath, absWorkspace) {
-			return "", fmt.Errorf("access denied: path is outside the workspace")
+			return "", fmt.Errorf("access denied: path is outside the workspace: %w", ErrWorkspaceBoundary)
 		}
 
 		var resolved string
@@ -77,13 +79,13 @@ func validatePathWithAllowPaths(
 
 		if resolved, err = filepath.EvalSymlinks(absPath); err == nil {
 			if !isWithinWorkspace(resolved, workspaceReal) {
-				return "", fmt.Errorf("access denied: symlink resolves outside workspace")
+				return "", fmt.Errorf("access denied: symlink resolves outside workspace: %w", ErrWorkspaceBoundary)
 			}
 		} else if os.IsNotExist(err) {
 			var parentResolved string
 			if parentResolved, err = resolveExistingAncestor(filepath.Dir(absPath)); err == nil {
 				if !isWithinWorkspace(parentResolved, workspaceReal) {
-					return "", fmt.Errorf("access denied: symlink resolves outside workspace")
+					return "", fmt.Errorf("access denied: symlink resolves outside workspace: %w", ErrWorkspaceBoundary)
 				}
 			} else if !os.IsNotExist(err) {
 				return "", fmt.Errorf("failed to resolve path: %w", err)
@@ -421,7 +423,7 @@ func (t *ReadFileTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 
 	file, err := t.fs.Open(path)
 	if err != nil {
-		return ErrorResult(err.Error())
+		return errorResultFromFS(err)
 	}
 	defer file.Close()
 
@@ -569,7 +571,7 @@ func (t *ReadFileLinesTool) Execute(ctx context.Context, args map[string]any) *T
 
 	file, err := t.fs.Open(path)
 	if err != nil {
-		return ErrorResult(err.Error())
+		return errorResultFromFS(err)
 	}
 	defer file.Close()
 
@@ -929,7 +931,7 @@ func (t *WriteFileTool) Execute(ctx context.Context, args map[string]any) *ToolR
 	}
 
 	if err := t.fs.WriteFile(path, []byte(content)); err != nil {
-		return ErrorResult(err.Error())
+		return errorResultFromFS(err)
 	}
 
 	return SilentResult(fmt.Sprintf("File written: %s", path))
@@ -976,7 +978,7 @@ func (t *ListDirTool) Execute(ctx context.Context, args map[string]any) *ToolRes
 
 	entries, err := t.fs.ReadDir(path)
 	if err != nil {
-		return ErrorResult(fmt.Sprintf("failed to read directory: %v", err))
+		return errorResultFromFSCtx("failed to read directory", err)
 	}
 	return formatDirEntries(entries)
 }
@@ -1012,7 +1014,7 @@ func (h *hostFs) ReadFile(path string) ([]byte, error) {
 			return nil, fmt.Errorf("failed to read file: file not found: %w", err)
 		}
 		if os.IsPermission(err) {
-			return nil, fmt.Errorf("failed to read file: access denied: %w", err)
+			return nil, fmt.Errorf("failed to read file: permission denied: %w", err)
 		}
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
@@ -1076,9 +1078,11 @@ func (r *sandboxFs) ReadFile(path string) ([]byte, error) {
 				return fmt.Errorf("failed to read file: file not found: %w", err)
 			}
 			// os.Root returns "escapes from parent" for paths outside the root
-			if os.IsPermission(err) || strings.Contains(err.Error(), "escapes from parent") ||
-				strings.Contains(err.Error(), "permission denied") {
-				return fmt.Errorf("failed to read file: access denied: %w", err)
+			if strings.Contains(err.Error(), "escapes from parent") {
+				return fmt.Errorf("failed to read file: access denied: %w", ErrWorkspaceBoundary)
+			}
+			if os.IsPermission(err) || strings.Contains(err.Error(), "permission denied") {
+				return fmt.Errorf("failed to read file: permission denied: %w", err)
 			}
 			return fmt.Errorf("failed to read file: %w", err)
 		}
@@ -1162,9 +1166,11 @@ func (r *sandboxFs) Open(path string) (fs.File, error) {
 			if os.IsNotExist(err) {
 				return fmt.Errorf("failed to open file: file not found: %w", err)
 			}
-			if os.IsPermission(err) || strings.Contains(err.Error(), "escapes from parent") ||
-				strings.Contains(err.Error(), "permission denied") {
-				return fmt.Errorf("failed to open file: access denied: %w", err)
+			if strings.Contains(err.Error(), "escapes from parent") {
+				return fmt.Errorf("failed to open file: access denied: %w", ErrWorkspaceBoundary)
+			}
+			if os.IsPermission(err) || strings.Contains(err.Error(), "permission denied") {
+				return fmt.Errorf("failed to open file: permission denied: %w", err)
 			}
 			return fmt.Errorf("failed to open file: %w", err)
 		}
@@ -1243,8 +1249,26 @@ func getSafeRelPath(workspace, path string) (string, error) {
 	}
 
 	if !filepath.IsLocal(rel) {
-		return "", fmt.Errorf("path escapes workspace: %s", path)
+		return "", fmt.Errorf("path escapes workspace: %s: %w", path, ErrWorkspaceBoundary)
 	}
 
 	return rel, nil
+}
+
+// errorResultFromFS wraps an error into an ErrorResult, attaching BlockedTypeDenied
+// when the error is (or wraps) ErrWorkspaceBoundary.
+func errorResultFromFS(err error) *ToolResult {
+	if errors.Is(err, ErrWorkspaceBoundary) {
+		return ErrorResult(err.Error()).WithBlockedType(BlockedTypeDenied)
+	}
+	return ErrorResult(err.Error())
+}
+
+// errorResultFromFSCtx is like errorResultFromFS but prepends context.
+func errorResultFromFSCtx(context string, err error) *ToolResult {
+	msg := fmt.Sprintf("%s: %v", context, err)
+	if errors.Is(err, ErrWorkspaceBoundary) {
+		return ErrorResult(msg).WithBlockedType(BlockedTypeDenied)
+	}
+	return ErrorResult(msg)
 }

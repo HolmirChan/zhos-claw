@@ -71,7 +71,7 @@ func (t *EditFileTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 
 	beforeContent, afterContent, err := editFile(t.fs, path, oldText, newText)
 	if err != nil {
-		return ErrorResult(err.Error())
+		return errorResultFromFS(err)
 	}
 	return DiffResult(path, beforeContent, afterContent)
 }
@@ -125,7 +125,7 @@ func (t *AppendFileTool) Execute(ctx context.Context, args map[string]any) *Tool
 	}
 
 	if err := appendFile(t.fs, path, content); err != nil {
-		return ErrorResult(err.Error())
+		return errorResultFromFS(err)
 	}
 	return SilentResult(fmt.Sprintf("Appended to %s", path))
 }
