@@ -14,7 +14,7 @@ HOME_DIR_NAME=$(grep 'DefaultHome' "$ENV_GO" | grep -o '"\.[a-z]*"' | tr -d '"')
 
 DEVICE_IP=${DEVICE_IP:-"192.168.1.100"}
 DEVICE_PORT=${DEVICE_PORT:-"5555"}
-REMOTE_DIR="/data/${CMD}"
+REMOTE_DIR="/userdata/${CMD}"
 PICOCLAW_HOME_DIR="${REMOTE_DIR}/${HOME_DIR_NAME}"
 LOG_DIR="${PICOCLAW_HOME_DIR}/logs"
 HDC="hdc -t ${DEVICE_IP}:${DEVICE_PORT}"
