@@ -61,6 +61,7 @@ const (
 	PromptSourceSteering       PromptSourceID = "turn:steering"
 	PromptSourceSubTurnResult  PromptSourceID = "turn:subturn_result"
 	PromptSourceInterrupt      PromptSourceID = "turn:interrupt"
+	PromptSourceToolGuard     PromptSourceID = "tool:guardrails"
 )
 
 type PromptCachePolicy string
@@ -265,6 +266,13 @@ func builtinPromptSources() []PromptSourceDescriptor {
 			Description:     "Graceful interrupt hint injected into the terminal LLM call",
 			Allowed:         []PromptPlacement{{Layer: PromptLayerTurn, Slot: PromptSlotInterrupt}},
 			StableByDefault: false,
+		},
+		{
+			ID:              PromptSourceToolGuard,
+			Owner:           "agent",
+			Description:     "Tool failure guardrails — when to stop retrying blocked/denied tools",
+			Allowed:         []PromptPlacement{{Layer: PromptLayerCapability, Slot: PromptSlotTooling}},
+			StableByDefault: true,
 		},
 	}
 }
