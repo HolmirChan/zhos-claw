@@ -28,7 +28,8 @@ echo "==> Connecting to device ${DEVICE_IP}:${DEVICE_PORT}..."
 hdc tconn "${DEVICE_IP}:${DEVICE_PORT}"
 
 echo "==> Stopping existing processes..."
-${HDC} shell "pkill -f ${CMD}-web || true; pkill -f ${CMD} || true"
+${HDC} shell "pkill -f ${CMD}-web || true"
+${HDC} shell "pkill -f ${CMD} || true"
 
 echo "==> Remounting filesystems as read-write..."
 ${HDC} shell "mount -o rw,remount /"
