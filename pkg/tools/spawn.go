@@ -137,6 +137,10 @@ Task: %s`,
 				result = ErrorResult(fmt.Sprintf("Spawn failed: %v", err)).WithError(err)
 			}
 
+			// 子 turn 的边界拦截不传播给父 turn 计数器
+			if result != nil {
+				result.BlockedType = ""
+			}
 			// Call callback if provided
 			if cb != nil {
 				cb(ctx, result)
