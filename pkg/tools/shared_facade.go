@@ -36,6 +36,9 @@ const (
 	ToolPromptSlotMCP         = toolshared.ToolPromptSlotMCP
 	ToolPromptSourceRegistry  = toolshared.ToolPromptSourceRegistry
 	ToolPromptSourceDiscovery = toolshared.ToolPromptSourceDiscovery
+
+	BlockedTypeBlocked = toolshared.BlockedTypeBlocked
+	BlockedTypeDenied  = toolshared.BlockedTypeDenied
 )
 
 func WithToolContext(ctx context.Context, channel, chatID string) context.Context {

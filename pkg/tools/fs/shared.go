@@ -39,3 +39,7 @@ func DiffResult(path string, before, after []byte) *ToolResult {
 func MediaResult(forLLM string, mediaRefs []string) *ToolResult {
 	return toolshared.MediaResult(forLLM, mediaRefs)
 }
+
+const (
+	BlockedTypeDenied = toolshared.BlockedTypeDenied
+)

@@ -10,6 +10,9 @@ import (
 const (
 	HandledToolLLMNote   = "The requested output has already been delivered to the user in the current chat. Do not call send_file or any other delivery tool again. If you reply, provide only a brief confirmation."
 	ArtifactPathsLLMNote = "Use `send_file` with one of these paths to send it to the user, or use file/exec tools to save it inside the workspace if requested."
+
+	BlockedTypeBlocked = "BLOCKED" // command prohibited, do not retry
+	BlockedTypeDenied  = "DENIED"  // target out of scope, retry in-scope once
 )
 
 // ToolResult represents the structured return value from tool execution.
@@ -75,6 +78,16 @@ func (tr *ToolResult) ContentForLLM() string {
 	content := tr.ForLLM
 	if content == "" && tr.Err != nil {
 		content = tr.Err.Error()
+	}
+	if tr.BlockedType != "" && content != "" {
+		prefix := "[ERROR] "
+		switch tr.BlockedType {
+		case BlockedTypeBlocked:
+			prefix = "[BLOCKED] "
+		case BlockedTypeDenied:
+			prefix = "[DENIED] "
+		}
+		content = prefix + content
 	}
 	if tr.ResponseHandled {
 		if content == "" {
@@ -163,6 +176,11 @@ func ErrorResult(message string) *ToolResult {
 		IsError: true,
 		Async:   false,
 	}
+}
+
+func (tr *ToolResult) WithBlockedType(t string) *ToolResult {
+	tr.BlockedType = t
+	return tr
 }
 
 // UserResult creates a ToolResult with content for both LLM and user.
