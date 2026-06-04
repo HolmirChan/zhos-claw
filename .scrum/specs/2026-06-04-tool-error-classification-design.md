@@ -64,15 +64,18 @@ func (ts *turnState) recordToolResult(tr *ToolResult) {
 
 **阈值设计**：LLM prompt 设 3 次自律停止，宿主设 5 次硬中断，中间留 2 轮缓冲供 LLM 完成"识别规则 → 输出告知用户"。若 `MaxToolIterations < 5`，计数器无机会触发——此时 iteration limit 本身就是有效保底。
 
-**计数器作用域**：仅本 turn。SubAgent（子 turn）内的计数器不向上传播到父 turn。
+**计数器作用域**：仅本 turn。SubAgent（子 turn）内的计数器不向上传播到父 turn。同时，子 turn 返回给父 turn 的最终 ToolResult **不携带**子 turn 的 BlockedType（由 SubAgent 相关代码主动清空）——父 turn 将子任务失败视为普通 IsError，避免父 turn 因子任务的工作区限制被误中断。
 
 **改动文件**：
 - `pkg/agent/prompt.go` — 注册 `PromptSourceToolGuard`
 - `pkg/agent/context.go` — 追加 prompt part
 - `pkg/agent/turn_state.go` — 新增字段 + `recordToolResult(*ToolResult)`
-- `pkg/agent/pipeline_execute.go` — 工具执行后调用 `ts.recordToolResult(toolResult)`（两处：正常执行路径 line ~673 和 hook respond 路径 line ~293）
+- `pkg/agent/pipeline_execute.go` — 三处调用 `ts.recordToolResult(toolResult)`：
+  - 同步执行路径：toolResult 已完成 hook 后处理、尚未 `messages = append` 之前
+  - Hook respond 路径：hookResult 确定后、messages append 之前
+  - Async 回调路径：async 工具独立回流（防御完备）
 
-**改动量**：~45 行
+**改动量**：~50 行
 
 ### 阶段二：ToolResult 结构化错误标记
 
@@ -102,7 +105,7 @@ func (tr *ToolResult) WithBlockedType(t string) *ToolResult {
 }
 ```
 
-**ContentForLLM 拼装顺序**：`[PREFIX] body \n HandledNote \n ArtifactNote`。前缀在最外层，不被 trailing note 包裹。
+**ContentForLLM 拼装顺序**：`[PREFIX] body \n HandledNote \n ArtifactNote`。前缀仅当 `BlockedType != ""` 且 `content != ""` 时追加（避免输出裸 `[BLOCKED] `）。BlockedType 必须与非空 ForLLM 一起设置（约定）。
 
 #### shell.go 改动
 
@@ -148,7 +151,7 @@ if os.IsPermission(err) {
 }
 ```
 
-**hostFs**（1015/1039）：不改。`os.IsPermission` 是 OS 权限问题，不挂 sentinel。
+**hostFs**（1015/1039）：不改。`os.IsPermission` 是 OS 权限问题，不挂 sentinel。另将 hostFs 中 OS 权限分支的文案从 "access denied" 改为 "permission denied"，降低与 `[DENIED]` 分类的视觉相似度，避免 LLM 误判。
 
 **Execute 层 helper**：
 
@@ -234,7 +237,7 @@ func errorResultFromFSCtx(context string, err error) *ToolResult {
 
 ## 测试策略
 
-- `go test ./pkg/agent/...` — prompt part 注入 + 计数器逻辑 + 成功时清零 + 计数器不上溯父 turn + abort 后不累加
+- `go test ./pkg/agent/...` — prompt part 注入 + 计数器逻辑 + 成功时清零 + 计数器不上溯父 turn + abort 后不累加 + async 回调路径计数
 - `go test ./pkg/tools/shared/...` — ContentForLLM 前缀拼装顺序
 - `go test ./pkg/tools/...` — ErrWorkspaceBoundary 传播 + guardCommand 签名 + errorResultFromFS/errorResultFromFSCtx 覆盖全 6 处
 - `go test ./pkg/tools/fs/...` — helper 分类正确 + OS 权限错误不挂 sentinel + getSafeRelPath 挂 sentinel
