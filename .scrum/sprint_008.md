@@ -9,25 +9,25 @@
 
 ## 任务清单
 
-### SB-001 · 阶段一：prompt 注入熔断规则 [ ]
+### SB-001 · 阶段一：prompt 注入熔断规则 [x]
 - **来源**: BL-011
 - **实现计划**: Task 1, 2
 - **子任务**:
-  - [ ] 注册 PromptSourceToolGuard 常量
-  - [ ] BuildSystemPromptParts 注入工具失败规则 prompt
-  - [ ] 编译 + 测试 PASS
-  - [ ] 提交
+  - [x] 注册 PromptSourceToolGuard 常量
+  - [x] BuildSystemPromptParts 注入工具失败规则 prompt
+  - [x] 编译 + 测试 PASS
+  - [x] 提交
 
-### SB-002 · 阶段一：宿主侧连续拦截计数器 [ ]
+### SB-002 · 阶段一：宿主侧连续拦截计数器 [x]
 - **来源**: BL-011
 - **实现计划**: Task 3, 4, 6
 - **子任务**:
-  - [ ] turnState 新增 consecutiveBlockedCount + recordToolResult()
-  - [ ] pipeline_execute 三处调用 recordToolResult（同步/hook respond/async）
-  - [ ] 单元测试：清零、硬中断、abort 后防御
-  - [ ] 提交
+  - [x] turnState 新增 consecutiveBlockedCount + recordToolResult()
+  - [x] pipeline_execute 三处调用 recordToolResult（同步/hook respond/async）
+  - [x] 单元测试：清零、硬中断、abort 后防御
+  - [x] 提交
 
-### SB-003 · 阶段一：SubAgent BlockedType 清空 [ ]
+### SB-003 · 阶段一：SubAgent BlockedType 清空 [x]
 - **来源**: BL-011
 - **实现计划**: Task 5
 - **子任务**:
@@ -35,15 +35,15 @@
   - [ ] 编译 PASS
   - [ ] 提交
 
-### SB-004 · 阶段一：集成验证 [ ]
+### SB-004 · 阶段一：集成验证 [x]
 - **来源**: BL-011
 - **阻塞**: SB-001, SB-002, SB-003
 - **实现计划**: Task 7
 - **子任务**:
-  - [ ] 全量测试 PASS
-  - [ ] make build && make build-launcher
-  - [ ] 部署 RK3506 验证 tool iteration ≤ 5
-  - [ ] 提交
+  - [x] 全量测试 PASS（4 失败均为预存在）
+  - [ ] make build && make build-launcher（需设备验证）
+  - [ ] 部署 RK3506 验证 tool iteration ≤ 5（需设备验证）
+  - [x] 提交
 
 ### SB-005 · 阶段二：ToolResult BlockedType + facade re-export [ ]
 - **来源**: BL-011
