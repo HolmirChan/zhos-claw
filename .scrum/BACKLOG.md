@@ -1,21 +1,24 @@
 # Backlog
 
-> 当前迭代: sprint_008
+> 当前迭代: 无
 
 ## 待规划
+
+（空）
+
+## 已交付
 
 ### BL-011 · Tool Result 错误分类与熔断
 - **意图**: Agent 工具调用被 safety guard / workspace 边界反复拦截时，主动停止并告知用户（解决 RK3506 上 42 次重复拦截不停止的问题）
 - **方案方向**: 两阶段——先 prompt 注入熔断规则 + 宿主侧连续拦截计数器（硬中断保底），再给 ToolResult 加 BlockedType 分类让 LLM 精准识别
 - **设计文档**: .scrum/specs/2026-06-04-tool-error-classification-design.md
 - **实现计划**: .scrum/plans/2026-06-04-tool-error-classification.md
+- **已完成于**: sprint_008.md
 - **验收标准**:
-  - [ ] 阶段一上线后，被拦截 session tool iteration ≤ 5
-  - [ ] 阶段二上线后，LLM 看到 [BLOCKED]/[DENIED] 前缀后自行停止 ≤ 3 次
-  - [ ] 正常探索（file-not-found 等）不受影响
-  - [ ] JSONL 可审计 blocked_type 字段
-
-## 已交付
+  - [x] 阶段一上线后，被拦截 session tool iteration ≤ 5
+  - [x] 阶段二上线后，LLM 看到 [BLOCKED]/[DENIED] 前缀后自行停止 ≤ 3 次
+  - [x] 正常探索（file-not-found 等）不受影响
+  - [x] JSONL 可审计 blocked_type 字段
 
 ### BL-008 · 语音交互支持
 - **意图**: Agent 支持语音输入（STT）和语音输出（TTS），Web UI 和 CLI 均可使用

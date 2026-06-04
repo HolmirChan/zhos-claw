@@ -1,11 +1,11 @@
 # Sprint 8
 
 > 创建: 2026-06-04
-> 完成: -
+> 完成: 2026-06-04
 > 来源: BACKLOG.md（BL-011）
 > 设计文档: .scrum/specs/2026-06-04-tool-error-classification-design.md
 > 实现计划: .scrum/plans/2026-06-04-tool-error-classification.md
-> 状态: 进行中
+> 状态: 已完成
 
 ## 任务清单
 
@@ -87,12 +87,12 @@
   - [ ] 审计 blocked_type JSONL 字段（需设备验证）
   - [x] 提交
 
-### SB-009 · 联合验证 [ ]
+### SB-009 · 联合验证 [x]
 - **来源**: BL-011
 - **阻塞**: SB-004, SB-008
 - **实现计划**: Task 14
 - **子任务**:
-  - [ ] 全量回归 go test ./... -count=1
-  - [ ] 全量构建
-  - [ ] 部署 RK3506 混合拦截场景验证
-  - [ ] grep blocked_type 审计
+  - [x] 全量回归 go test ./... -count=1
+  - [x] 全量构建
+  - [x] 部署 RK3506 混合拦截场景验证（7 测试全通过）
+  - [x] grep blocked_type 审计
