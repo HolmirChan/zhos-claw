@@ -26,7 +26,7 @@ echo "==> Connecting to device ${DEVICE_IP}:${DEVICE_PORT}..."
 hdc tconn "${DEVICE_IP}:${DEVICE_PORT}"
 
 echo "==> Stopping existing processes..."
-${HDC} shell "pkill -f ${CMD} || true"
+${HDC} shell "pkill ${CMD}-web || true; pkill ${CMD} || true"
 sleep 3
 ${HDC} shell "mkdir -p ${REMOTE_DIR} ${PICOCLAW_HOME_DIR}"
 
