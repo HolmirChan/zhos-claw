@@ -1,7 +1,7 @@
 # Tool Result 错误分类与熔断
 
 > 创建: 2026-06-04
-> 修订: 2026-06-04 (r3)
+> 修订: 2026-06-04 (r5)
 > 状态: 待实现
 > 来源: RK3506 session 日志分析 — Agent 42 次工具调用全被 safety guard 拦截，不停止、不告知用户
 
@@ -64,7 +64,17 @@ func (ts *turnState) recordToolResult(tr *ToolResult) {
 
 **阈值设计**：LLM prompt 设 3 次自律停止，宿主设 5 次硬中断，中间留 2 轮缓冲供 LLM 完成"识别规则 → 输出告知用户"。若 `MaxToolIterations < 5`，计数器无机会触发——此时 iteration limit 本身就是有效保底。
 
-**计数器作用域**：仅本 turn。SubAgent（子 turn）内的计数器不向上传播到父 turn。同时，子 turn 返回给父 turn 的最终 ToolResult **不携带**子 turn 的 BlockedType（由 SubAgent 相关代码主动清空）——父 turn 将子任务失败视为普通 IsError，避免父 turn 因子任务的工作区限制被误中断。
+**计数器作用域**：仅本 turn。SubAgent（子 turn）内的计数器不向上传播到父 turn。子 turn 返回给父 turn 的最终 ToolResult **不携带**子 turn 的 BlockedType——在 `pkg/tools/spawn.go` 的 async goroutine 回调前主动清空：
+
+```go
+// spawn.go ~136-143: async goroutine 完成子 turn 后，回调前清空 BlockedType
+if result != nil {
+    result.BlockedType = "" // 子 turn 的边界拦截不传播给父 turn 计数器
+}
+if cb != nil {
+    cb(ctx, result)
+}
+```
 
 **改动文件**：
 - `pkg/agent/prompt.go` — 注册 `PromptSourceToolGuard`
@@ -73,9 +83,10 @@ func (ts *turnState) recordToolResult(tr *ToolResult) {
 - `pkg/agent/pipeline_execute.go` — 三处调用 `ts.recordToolResult(toolResult)`：
   - 同步执行路径：toolResult 已完成 hook 后处理、尚未 `messages = append` 之前
   - Hook respond 路径：hookResult 确定后、messages append 之前
-  - Async 回调路径：async 工具独立回流（防御完备）
+  - Async 回调路径：async 工具独立回流，防御未来新增 async 工具产生 BlockedType（当前 spawn_agent 等不直接产生，但加调用完备对称）
+- `pkg/tools/spawn.go` — SubAgent async goroutine 回调前清空 `result.BlockedType`
 
-**改动量**：~50 行
+**改动量**：~55 行
 
 ### 阶段二：ToolResult 结构化错误标记
 
