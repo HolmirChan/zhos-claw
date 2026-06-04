@@ -295,6 +295,7 @@ toolLoop:
 						toolErrorSummary(hookResult),
 						inferSkillNamesFromToolCall(ts, toolName, toolArgs),
 					)
+					ts.recordToolResult(hookResult)
 
 					messages = append(messages, toolResultMsg)
 					if !ts.opts.NoHistory {
@@ -480,6 +481,7 @@ toolLoop:
 				_ = al.bus.PublishOutbound(outCtx, outboundMessageForTurn(ts, result.ForUser))
 			}
 
+			ts.recordToolResult(result)
 			content := result.ContentForLLM()
 			if content == "" {
 				return
@@ -677,6 +679,7 @@ toolLoop:
 			toolErrorSummary(toolResult),
 			inferSkillNamesFromToolCall(ts, toolName, toolArgs),
 		)
+		ts.recordToolResult(toolResult)
 		messages = append(messages, toolResultMsg)
 		if !ts.opts.NoHistory {
 			ts.agent.Sessions.AddFullMessage(ts.sessionKey, toolResultMsg)
