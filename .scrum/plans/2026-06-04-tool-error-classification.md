@@ -278,7 +278,7 @@ Co-Authored-By: Claude Code"
 
 测试文件 package 为 `agent`，需要 import `tools "github.com/sipeed/picoclaw/pkg/tools"` 用 `tools.ToolResult`。
 
-- [ ] **Step 1: 写计数器清零测试**
+以下三个测试函数追加到同一个文件 `pkg/agent/turn_state_test.go`。
 
 ```go
 package agent
@@ -290,9 +290,10 @@ import (
 
 func TestRecordToolResult_ResetsOnNormalError(t *testing.T) {
     ts := &turnState{}
-    ts.recordToolResult(&tools.ToolResult{BlockedType: tools.BlockedTypeBlocked})
-    ts.recordToolResult(&tools.ToolResult{BlockedType: tools.BlockedTypeDenied})
-    ts.recordToolResult(&tools.ToolResult{BlockedType: tools.BlockedTypeBlocked})
+    // 测试只验证 BlockedType != "" 的语义，常量在 Task 8 引入后由分类测试覆盖
+    ts.recordToolResult(&tools.ToolResult{BlockedType: "BLOCKED"})
+    ts.recordToolResult(&tools.ToolResult{BlockedType: "DENIED"})
+    ts.recordToolResult(&tools.ToolResult{BlockedType: "BLOCKED"})
     if ts.consecutiveBlockedCount != 3 {
         t.Fatalf("expected count=3 after 3 blocked, got %d", ts.consecutiveBlockedCount)
     }
@@ -304,13 +305,14 @@ func TestRecordToolResult_ResetsOnNormalError(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: 写硬中断测试**
+- [ ] **Step 2: 写硬中断测试（同文件追加）**
 
 ```go
 func TestRecordToolResult_HardAbortsAt5(t *testing.T) {
     ts := &turnState{}
+    // 用字面值避免对 Task 8 常量的编译期依赖
     for i := 0; i < 5; i++ {
-        ts.recordToolResult(&tools.ToolResult{BlockedType: tools.BlockedTypeBlocked})
+        ts.recordToolResult(&tools.ToolResult{BlockedType: "BLOCKED"})
     }
     if !ts.hardAbortRequested() {
         t.Fatal("expected hard abort after 5 consecutive blocked results")
@@ -318,15 +320,15 @@ func TestRecordToolResult_HardAbortsAt5(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: 写 abort 后不再累加测试**
+- [ ] **Step 3: 写 abort 后不再累加测试（同文件追加）**
 
 ```go
 func TestRecordToolResult_NoOpAfterHardAbort(t *testing.T) {
     ts := &turnState{}
     for i := 0; i < 5; i++ {
-        ts.recordToolResult(&tools.ToolResult{BlockedType: tools.BlockedTypeBlocked})
+        ts.recordToolResult(&tools.ToolResult{BlockedType: "BLOCKED"})
     }
-    ts.recordToolResult(&tools.ToolResult{BlockedType: tools.BlockedTypeBlocked})
+    ts.recordToolResult(&tools.ToolResult{BlockedType: "BLOCKED"})
     if ts.consecutiveBlockedCount != 5 {
         t.Fatalf("expected count=5 after abort, got %d", ts.consecutiveBlockedCount)
     }
