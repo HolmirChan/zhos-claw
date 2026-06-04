@@ -273,6 +273,28 @@ Each part separated by the marker will be sent as an independent message.`,
 		})
 	}
 
+	// Tool failure guardrails — instruct LLM when to stop retrying
+	add(PromptPart{
+		ID:     "capability.tool_guardrails",
+		Layer:  PromptLayerCapability,
+		Slot:   PromptSlotTooling,
+		Source: PromptSource{ID: PromptSourceToolGuard, Name: "guardrails"},
+		Title:  "tool failure rules",
+		Content: `# TOOL FAILURE RULES (CRITICAL)
+
+Tool results may be prefixed with error classifications:
+- [BLOCKED] — command itself is prohibited (dangerous pattern, not in allowlist, explicit path traversal). DO NOT retry or bypass.
+- [DENIED] — path or target is outside the allowed scope (workspace boundary). You may retry with an in-scope path.
+
+Rules:
+1. If you receive [BLOCKED], stop immediately. Do not try alternative commands or encoding tricks.
+2. If you receive [DENIED], you may retry with a workspace-internal or in-scope path. If the retry also yields [DENIED], stop.
+3. After 3 consecutive [BLOCKED] or [DENIED] results, stop immediately. Tell the user: "I'm unable to complete this task because of safety restrictions."
+4. Normal errors (file not found, invalid arguments, OS permission denied on an in-workspace file) do NOT count toward the limit — only [BLOCKED] and [DENIED] count.`,
+		Stable: true,
+		Cache:  PromptCacheEphemeral,
+	})
+
 	stack.Seal()
 	return stack.Parts()
 }
