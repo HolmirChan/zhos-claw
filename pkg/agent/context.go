@@ -288,7 +288,7 @@ Tool results may be prefixed with error classifications:
 
 Rules:
 1. If you receive [BLOCKED], stop immediately. Do not retry. Do not try alternative commands, encoding tricks, or path variants. Tell the user what was blocked and why.
-2. If you receive [DENIED], you may retry ONCE with a workspace-internal path. If the retry also yields [DENIED], stop and tell the user.
+2. If you receive [DENIED], retry ONCE — achieve the same goal using a path or command inside the workspace (e.g. workspace script, list_dir, find). Do NOT retry the same external path with a different tool. If no workspace-internal alternative exists, explain the limitation and suggest what the user can do.
 3. After 3 consecutive [DENIED] results (even across different paths), stop immediately.
 4. Normal errors (file not found, invalid arguments, OS permission denied) do NOT count — only [BLOCKED] and [DENIED] count.`,
 		Stable: true,
