@@ -329,7 +329,7 @@ func (t *ExecTool) executeRun(ctx context.Context, args map[string]any) *ToolRes
 		if t.restrictToWorkspace && t.workingDir != "" {
 			resolvedWD, err := validatePathWithAllowPaths(wd, t.workingDir, true, t.allowedPathPatterns)
 			if err != nil {
-				return ErrorResult("Command blocked by safety guard (" + err.Error() + ")")
+				return ErrorResult("Command blocked by safety guard (" + err.Error() + ")").WithBlockedType(BlockedTypeDenied)
 			}
 			cwd = resolvedWD
 		} else {
@@ -344,8 +344,9 @@ func (t *ExecTool) executeRun(ctx context.Context, args map[string]any) *ToolRes
 		}
 	}
 
-	if guardError := t.guardCommand(command, cwd); guardError != "" {
-		return ErrorResult(guardError)
+	blockedType, guardError := t.guardCommand(command, cwd)
+	if guardError != "" {
+		return ErrorResult(guardError).WithBlockedType(blockedType)
 	}
 
 	// Re-resolve symlinks immediately before execution to shrink the TOCTOU window
@@ -353,7 +354,7 @@ func (t *ExecTool) executeRun(ctx context.Context, args map[string]any) *ToolRes
 	if t.restrictToWorkspace && t.workingDir != "" && cwd != t.workingDir {
 		resolved, err := filepath.EvalSymlinks(cwd)
 		if err != nil {
-			return ErrorResult(fmt.Sprintf("Command blocked by safety guard (path resolution failed: %v)", err))
+			return ErrorResult(fmt.Sprintf("Command blocked by safety guard (path resolution failed: %v)", err)).WithBlockedType(BlockedTypeDenied)
 		}
 		if isAllowedPath(resolved, t.allowedPathPatterns) {
 			cwd = resolved
@@ -365,7 +366,7 @@ func (t *ExecTool) executeRun(ctx context.Context, args map[string]any) *ToolRes
 			}
 			rel, err := filepath.Rel(wsResolved, resolved)
 			if err != nil || !filepath.IsLocal(rel) {
-				return ErrorResult("Command blocked by safety guard (working directory escaped workspace)")
+				return ErrorResult("Command blocked by safety guard (working directory escaped workspace)").WithBlockedType(BlockedTypeDenied)
 			}
 			cwd = resolved
 		}
@@ -1069,7 +1070,7 @@ func expandPowerShellEnvVars(cmd string) string {
 	})
 }
 
-func (t *ExecTool) guardCommand(command, cwd string) string {
+func (t *ExecTool) guardCommand(command, cwd string) (string, string) {
 	cmd := strings.TrimSpace(command)
 	lower := strings.ToLower(cmd)
 
@@ -1085,7 +1086,7 @@ func (t *ExecTool) guardCommand(command, cwd string) string {
 	if !explicitlyAllowed {
 		for _, pattern := range t.denyPatterns {
 			if pattern.MatchString(lower) {
-				return "Command blocked by safety guard (dangerous pattern detected)"
+				return BlockedTypeBlocked, "Command blocked by safety guard (dangerous pattern detected)"
 			}
 		}
 	}
@@ -1099,19 +1100,19 @@ func (t *ExecTool) guardCommand(command, cwd string) string {
 			}
 		}
 		if !allowed {
-			return "Command blocked by safety guard (not in allowlist)"
+			return BlockedTypeBlocked, "Command blocked by safety guard (not in allowlist)"
 		}
 	}
 
 	if t.restrictToWorkspace {
 		// Block path traversal patterns including .../.../ variants
 		if regexp.MustCompile(`\.\.(?:[\\/]\.\.)*[\\/]`).MatchString(cmd) {
-			return "Command blocked by safety guard (path traversal detected)"
+			return BlockedTypeBlocked, "Command blocked by safety guard (path traversal detected)"
 		}
 
 		cwdPath, err := filepath.Abs(cwd)
 		if err != nil {
-			return ""
+			return "", ""
 		}
 
 		// Web URL schemes whose path components (starting with //) should be exempt
@@ -1189,12 +1190,12 @@ func (t *ExecTool) guardCommand(command, cwd string) string {
 			}
 
 			if strings.HasPrefix(rel, "..") {
-				return "Command blocked by safety guard (path outside working dir)"
+				return BlockedTypeDenied, "Command blocked by safety guard (path outside working dir)"
 			}
 		}
 	}
 
-	return ""
+	return "", ""
 }
 
 func (t *ExecTool) SetTimeout(timeout time.Duration) {
