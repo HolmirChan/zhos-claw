@@ -27,9 +27,7 @@ hdc tconn "${DEVICE_IP}:${DEVICE_PORT}"
 
 echo "==> Stopping existing processes..."
 ${HDC} shell "pkill -f ${CMD}-web || true; pkill -f ${CMD} || true"
-sleep 2
-echo "==> Verifying processes stopped..."
-${HDC} shell "pgrep -f ${CMD} && echo 'WARNING: process still running' || echo 'OK'"
+sleep 3
 ${HDC} shell "mkdir -p ${REMOTE_DIR} ${PICOCLAW_HOME_DIR}"
 
 echo "==> Uploading files..."
