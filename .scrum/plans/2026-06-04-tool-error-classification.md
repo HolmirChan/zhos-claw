@@ -21,7 +21,7 @@
 
 - [ ] **Step 1: 添加常量定义**
 
-在 `pkg/agent/prompt.go` 的 PromptSourceID 常量块末尾（`PromptSourceInterrupt` 之后）追加：
+在 `pkg/agent/prompt.go` 的 `PromptSourceID` 常量块末尾（`PromptSourceInterrupt` 之后）追加：
 
 ```go
 PromptSourceToolGuard PromptSourceID = "tool:guardrails"
@@ -145,21 +145,22 @@ consecutiveBlockedCount int
 // Reaching 5 consecutive blocked results triggers a hard abort.
 // No-op if hard abort already requested (defensive).
 func (ts *turnState) recordToolResult(tr *ToolResult) {
-	ts.mu.Lock()
-	defer ts.mu.Unlock()
-	if ts.hardAbort {
-		return // defensive: no-op after abort
-	}
-	if tr != nil && tr.BlockedType != "" {
-		ts.consecutiveBlockedCount++
-	} else {
-		ts.consecutiveBlockedCount = 0
-	}
-	if ts.consecutiveBlockedCount >= 5 {
-		ts.mu.Unlock()
-		ts.requestHardAbort()
-		ts.mu.Lock()
-	}
+    ts.mu.Lock()
+    if ts.hardAbort {
+        ts.mu.Unlock()
+        return
+    }
+    if tr != nil && tr.BlockedType != "" {
+        ts.consecutiveBlockedCount++
+    } else {
+        ts.consecutiveBlockedCount = 0
+    }
+    shouldAbort := ts.consecutiveBlockedCount >= 5
+    ts.mu.Unlock()
+
+    if shouldAbort {
+        ts.requestHardAbort() // idempotent, self-locking — called outside our lock
+    }
 }
 ```
 
@@ -176,7 +177,7 @@ git add pkg/agent/turn_state.go
 git commit -m "feat: turnState 新增 consecutiveBlockedCount 计数器
 
 阶段一宿主侧：recordToolResult() 在 BlockedType 非空时 +1，
-非 Blocked 结果（含普通错误）清零。连续 5 次触发硬中断。
+非 Blocked 结果（含普通错误）清零。连续 5 次在锁外调用 idempotent requestHardAbort。
 
 Author: Holmir Chan <chenhaoming@talkweb.com.cn>
 Co-Authored-By: Claude Code"
@@ -189,17 +190,17 @@ Co-Authored-By: Claude Code"
 **文件:**
 - 修改: `pkg/agent/pipeline_execute.go`
 
-- [ ] **Step 1: 同步执行路径（toolResult 确定后，messages append 前）**
+- [ ] **Step 1: 同步执行路径**
 
-在约 673 行 `ts.recordToolExecution(...)` 之后、`messages = append(messages, toolResultMsg)` 之前，添加：
+在 `ts.recordToolExecution(...)` 之后、`messages = append(messages, toolResultMsg)` 之前（约 673-680 行之间），添加：
 
 ```go
 ts.recordToolResult(toolResult)
 ```
 
-- [ ] **Step 2: Hook respond 路径（hookResult 确定后，messages append 前）**
+- [ ] **Step 2: Hook respond 路径**
 
-在约 293 行 `ts.recordToolExecution(...)` 之后，添加：
+在 `ts.recordToolExecution(...)` 之后、`messages = append(messages, toolResultMsg)` 之前（约 292-299 行之间），添加：
 
 ```go
 ts.recordToolResult(hookResult)
@@ -207,7 +208,7 @@ ts.recordToolResult(hookResult)
 
 - [ ] **Step 3: Async 回调路径**
 
-在约 477 行 `asyncCallback` 函数体内，`result.ContentForLLM()` 之前，添加：
+在 `asyncCallback` 函数体内（约 477 行），`content := result.ContentForLLM()` 之前，添加：
 
 ```go
 ts.recordToolResult(result)
@@ -264,7 +265,7 @@ go build -tags goolm,stdjson ./pkg/tools/...
 git add pkg/tools/spawn.go
 git commit -m "feat: SubAgent 返回前清空 BlockedType 防父 turn 误计数
 
-作者: Holmir Chan <chenhaoming@talkweb.com.cn>
+Author: Holmir Chan <chenhaoming@talkweb.com.cn>
 Co-Authored-By: Claude Code"
 ```
 
@@ -273,22 +274,30 @@ Co-Authored-By: Claude Code"
 ### Task 6: 阶段一单元测试
 
 **文件:**
-- 修改: `pkg/agent/turn_state_test.go`（如不存在则新建）
+- 创建: `pkg/agent/turn_state_test.go`
+
+测试文件 package 为 `agent`，需要 import `tools "github.com/sipeed/picoclaw/pkg/tools"` 用 `tools.ToolResult`。
 
 - [ ] **Step 1: 写计数器清零测试**
 
 ```go
+package agent
+
+import (
+    "testing"
+    tools "github.com/sipeed/picoclaw/pkg/tools"
+)
+
 func TestRecordToolResult_ResetsOnNormalError(t *testing.T) {
     ts := &turnState{}
-    // 3 blocked results
-    ts.recordToolResult(&ToolResult{BlockedType: "BLOCKED"})
-    ts.recordToolResult(&ToolResult{BlockedType: "DENIED"})
-    ts.recordToolResult(&ToolResult{BlockedType: "BLOCKED"})
+    ts.recordToolResult(&tools.ToolResult{BlockedType: tools.BlockedTypeBlocked})
+    ts.recordToolResult(&tools.ToolResult{BlockedType: tools.BlockedTypeDenied})
+    ts.recordToolResult(&tools.ToolResult{BlockedType: tools.BlockedTypeBlocked})
     if ts.consecutiveBlockedCount != 3 {
         t.Fatalf("expected count=3 after 3 blocked, got %d", ts.consecutiveBlockedCount)
     }
     // Normal error resets
-    ts.recordToolResult(&ToolResult{IsError: true}) // file-not-found etc
+    ts.recordToolResult(&tools.ToolResult{IsError: true})
     if ts.consecutiveBlockedCount != 0 {
         t.Fatalf("expected count reset to 0 after normal error, got %d", ts.consecutiveBlockedCount)
     }
@@ -301,7 +310,7 @@ func TestRecordToolResult_ResetsOnNormalError(t *testing.T) {
 func TestRecordToolResult_HardAbortsAt5(t *testing.T) {
     ts := &turnState{}
     for i := 0; i < 5; i++ {
-        ts.recordToolResult(&ToolResult{BlockedType: "BLOCKED"})
+        ts.recordToolResult(&tools.ToolResult{BlockedType: tools.BlockedTypeBlocked})
     }
     if !ts.hardAbortRequested() {
         t.Fatal("expected hard abort after 5 consecutive blocked results")
@@ -315,9 +324,9 @@ func TestRecordToolResult_HardAbortsAt5(t *testing.T) {
 func TestRecordToolResult_NoOpAfterHardAbort(t *testing.T) {
     ts := &turnState{}
     for i := 0; i < 5; i++ {
-        ts.recordToolResult(&ToolResult{BlockedType: "BLOCKED"})
+        ts.recordToolResult(&tools.ToolResult{BlockedType: tools.BlockedTypeBlocked})
     }
-    ts.recordToolResult(&ToolResult{BlockedType: "BLOCKED"})
+    ts.recordToolResult(&tools.ToolResult{BlockedType: tools.BlockedTypeBlocked})
     if ts.consecutiveBlockedCount != 5 {
         t.Fatalf("expected count=5 after abort, got %d", ts.consecutiveBlockedCount)
     }
@@ -338,7 +347,7 @@ git commit -m "test: recordToolResult 计数器单元测试
 
 覆盖：清零、硬中断、abort 后防御。
 
-作者: Holmir Chan <chenhaoming@talkweb.com.cn>
+Author: Holmir Chan <chenhaoming@talkweb.com.cn>
 Co-Authored-By: Claude Code"
 ```
 
@@ -381,45 +390,47 @@ Co-Authored-By: Claude Code"
 
 ## 阶段二：ToolResult 结构化错误标记
 
-### Task 8: result.go 新增 BlockedType
+### Task 8: result.go 新增 BlockedType + facade 常量 re-export
 
 **文件:**
 - 修改: `pkg/tools/shared/result.go`
+- 修改: `pkg/tools/shared_facade.go`
+- 修改: `pkg/tools/fs/shared.go`
 
-- [ ] **Step 1: 添加常量**
+- [ ] **Step 1: result.go 添加常量**
 
-在现有常量块后追加：
+在 `pkg/tools/shared/result.go` 现有常量块后追加：
 
 ```go
 const (
-	BlockedTypeBlocked = "BLOCKED" // command prohibited, do not retry
-	BlockedTypeDenied  = "DENIED"  // target out of scope, retry in-scope once
+    BlockedTypeBlocked = "BLOCKED" // command prohibited, do not retry
+    BlockedTypeDenied  = "DENIED"  // target out of scope, retry in-scope once
 )
 ```
 
-- [ ] **Step 2: ToolResult 结构体添加字段**
+- [ ] **Step 2: result.go ToolResult 结构体添加字段**
 
 在 `ToolResult` struct 中追加：
 
 ```go
 // BlockedType indicates this result was blocked/denied. Empty = normal.
-// "BLOCKED" → systemic restriction, don't retry.
-// "DENIED" → scope/boundary restriction, retry in-scope once.
+// BlockedTypeBlocked → systemic restriction, don't retry.
+// BlockedTypeDenied → scope/boundary restriction, retry in-scope once.
 BlockedType string `json:"blocked_type,omitempty"`
 ```
 
-- [ ] **Step 3: 添加 WithBlockedType 方法**
+- [ ] **Step 3: result.go 添加 WithBlockedType 方法**
 
 ```go
 func (tr *ToolResult) WithBlockedType(t string) *ToolResult {
-	tr.BlockedType = t
-	return tr
+    tr.BlockedType = t
+    return tr
 }
 ```
 
-- [ ] **Step 4: 修改 ContentForLLM 添加前缀**
+- [ ] **Step 4: result.go 修改 ContentForLLM 添加前缀**
 
-在 `ContentForLLM()` 方法中，当前 content 变量确定之后、handled note 拼接之前，添加：
+在 `ContentForLLM()` 方法中，`if content == "" && tr.Err != nil` 段（约 73 行）**之后**、`if tr.ResponseHandled` 段（约 74 行）**之前**，插入：
 
 ```go
 if tr.BlockedType != "" && content != "" {
@@ -434,20 +445,45 @@ if tr.BlockedType != "" && content != "" {
 }
 ```
 
-- [ ] **Step 5: 运行单元测试**
+- [ ] **Step 5: shared_facade.go 常量 re-export**
+
+在 `pkg/tools/shared_facade.go` 的 `const` 块中追加：
+
+```go
+BlockedTypeBlocked = toolshared.BlockedTypeBlocked
+BlockedTypeDenied  = toolshared.BlockedTypeDenied
+```
+
+- [ ] **Step 6: pkg/tools/fs/shared.go 常量 re-export**
+
+在 `pkg/tools/fs/shared.go` 文件尾部追加：
+
+```go
+const (
+    BlockedTypeDenied = toolshared.BlockedTypeDenied
+)
+```
+
+- [ ] **Step 7: 编译验证**
+
+```bash
+go build -tags goolm,stdjson ./pkg/tools/...
+```
+
+- [ ] **Step 8: 运行单元测试**
 
 ```bash
 go test -tags goolm,stdjson ./pkg/tools/shared/ -run "TestContentForLLM" -v
 ```
 
-- [ ] **Step 6: 提交**
+- [ ] **Step 9: 提交**
 
 ```bash
-git add pkg/tools/shared/result.go
-git commit -m "feat: ToolResult 新增 BlockedType 字段、常量和 ContentForLLM 前缀
+git add pkg/tools/shared/result.go pkg/tools/shared_facade.go pkg/tools/fs/shared.go
+git commit -m "feat: ToolResult 新增 BlockedType + facade re-export
 
-阶段二核心：BlockedTypeBlocked/DENIED 常量，WithBlockedType builder，
-ContentForLLM 按 [BLOCKED]/[DENIED] 前缀拼装（仅非空 content 时追加）。
+BlockedTypeBlocked/DENIED 常量，WithBlockedType builder，
+ContentForLLM 前缀拼装。facade 层 re-export 供 shell/fs 包直接使用。
 
 Author: Holmir Chan <chenhaoming@talkweb.com.cn>
 Co-Authored-By: Claude Code"
@@ -460,39 +496,28 @@ Co-Authored-By: Claude Code"
 **文件:**
 - 修改: `pkg/tools/shell.go`
 
+shell.go 属于 package tools，通过 facade re-export 可直接用 `BlockedTypeBlocked` / `BlockedTypeDenied`，无需额外 import。
+
 - [ ] **Step 1: 修改 guardCommand 签名**
 
 ```go
-// 原来：func (t *ExecTool) guardCommand(command, cwd string) string
-// 改为：
 func (t *ExecTool) guardCommand(command, cwd string) (string, string) {
 ```
 
-- [ ] **Step 2: 修改 4 处内部 return（guardCommand 内部，约 1088/1102/1109/1192）**
+- [ ] **Step 2: 修改 6 处内部 return**
 
-```go
-// 1088: dangerous pattern → BLOCKED
-return BlockedTypeBlocked, "Command blocked by safety guard (dangerous pattern detected)"
-
-// 1102: not in allowlist → BLOCKED
-return BlockedTypeBlocked, "Command blocked by safety guard (not in allowlist)"
-
-// 1109: path traversal → BLOCKED
-return BlockedTypeBlocked, "Command blocked by safety guard (path traversal detected)"
-
-// 1192: path outside working dir → DENIED
-return BlockedTypeDenied, "Command blocked by safety guard (path outside working dir)"
-```
+| 行 | 返回 | 分类 |
+|----|------|------|
+| 1088 | `return BlockedTypeBlocked, "Command blocked by safety guard (dangerous pattern detected)"` | BLOCKED |
+| 1102 | `return BlockedTypeBlocked, "Command blocked by safety guard (not in allowlist)"` | BLOCKED |
+| 1109 | `return BlockedTypeBlocked, "Command blocked by safety guard (path traversal detected)"` | BLOCKED |
+| 1114 | `return "", ""` | 放行（filepath.Abs 失败） |
+| 1192 | `return BlockedTypeDenied, "Command blocked by safety guard (path outside working dir)"` | DENIED |
+| 1197 | `return "", ""` | 默认放行 |
 
 - [ ] **Step 3: 修改调用方（347 行）**
 
 ```go
-// 原来：
-if guardError := t.guardCommand(command, cwd); guardError != "" {
-    return ErrorResult(guardError)
-}
-
-// 改为：
 blockedType, guardError := t.guardCommand(command, cwd)
 if guardError != "" {
     return ErrorResult(guardError).WithBlockedType(blockedType)
@@ -502,37 +527,33 @@ if guardError != "" {
 - [ ] **Step 4: 修改 3 处直接 ErrorResult 返回（332/356/368）**
 
 ```go
-// 332:
+// 332: cwd 验证失败
 return ErrorResult("Command blocked by safety guard (" + err.Error() + ")").
     WithBlockedType(BlockedTypeDenied)
 
-// 356:
+// 356: 路径解析失败
 return ErrorResult(fmt.Sprintf("Command blocked by safety guard (path resolution failed: %v)", err)).
     WithBlockedType(BlockedTypeDenied)
 
-// 368:
+// 368: 工作目录逃逸 workspace
 return ErrorResult("Command blocked by safety guard (working directory escaped workspace)").
     WithBlockedType(BlockedTypeDenied)
 ```
 
-- [ ] **Step 5: 需要 import BlockedTypeDenied 常量**
-
-在 shell.go 顶部 import 块中确认已 import `toolshared`，使用 `toolshared.BlockedTypeBlocked` / `toolshared.BlockedTypeDenied`。
-
-- [ ] **Step 6: 运行测试**
+- [ ] **Step 5: 运行测试**
 
 ```bash
 go test -tags goolm,stdjson ./pkg/tools/ -run "TestExecTool" -v
 ```
 
-- [ ] **Step 7: 提交**
+- [ ] **Step 6: 提交**
 
 ```bash
 git add pkg/tools/shell.go
 git commit -m "feat: shell.go guardCommand 签名改为 (blockedType, errorMsg)
 
-dangerous pattern/not allowlist/path traversal → BLOCKED；
-path outside/symlink/cwd escape → DENIED。7 处返回点全部附 BlockedType。
+6 处 return 全部适配：dangerous pattern/not allowlist/path traversal → BLOCKED；
+path outside/symlink/cwd escape → DENIED；2 处放行 → (\"\", \"\")。
 
 Author: Holmir Chan <chenhaoming@talkweb.com.cn>
 Co-Authored-By: Claude Code"
@@ -547,11 +568,13 @@ Co-Authored-By: Claude Code"
 
 - [ ] **Step 1: 定义 sentinel error**
 
-在文件顶部 var 块中追加：
+在文件顶部 `var` 块中追加：
 
 ```go
 var ErrWorkspaceBoundary = errors.New("workspace boundary")
 ```
+
+确保顶部 import 已有 `"errors"`。
 
 - [ ] **Step 2: resolvePath 3 处挂 sentinel（69/80/86）**
 
@@ -567,32 +590,40 @@ return "", fmt.Errorf("access denied: symlink resolves outside workspace: %w", E
 - [ ] **Step 3: getSafeRelPath 1 处挂 sentinel（1246）**
 
 ```go
-// 原来：
-return "", fmt.Errorf("path escapes workspace: %s", path)
-// 改为：
 return "", fmt.Errorf("path escapes workspace: %s: %w", path, ErrWorkspaceBoundary)
 ```
 
-- [ ] **Step 4: sandboxFs.ReadFile 拆分 escapes from parent 分支（1079）**
+- [ ] **Step 4: sandboxFs.ReadFile 拆分三条件（1079-1081）**
 
 ```go
-// 原来一个分支合并 os.IsPermission + escapes from parent：
-if os.IsPermission(err) || strings.Contains(err.Error(), "escapes from parent") || ...
+// 原来：
+if os.IsPermission(err) || strings.Contains(err.Error(), "escapes from parent") ||
+    strings.Contains(err.Error(), "permission denied") {
+    return fmt.Errorf("failed to read file: access denied: %w", err)
+}
 
-// 改为分两个分支：
+// 改为：
 if strings.Contains(err.Error(), "escapes from parent") {
     return fmt.Errorf("failed to read file: access denied: %w", ErrWorkspaceBoundary)
 }
-if os.IsPermission(err) {
+if os.IsPermission(err) || strings.Contains(err.Error(), "permission denied") {
     return fmt.Errorf("failed to read file: permission denied: %w", err)
 }
 ```
 
-- [ ] **Step 5: sandboxFs.Open 同样拆分（1167）**
+- [ ] **Step 5: sandboxFs.Open 同样拆分（1165-1167）**
 
-与 Step 4 同样处理，拆分 `escapes from parent` 和 `os.IsPermission` 分支。
+```go
+// 改为（与 Step 4 对称）：
+if strings.Contains(err.Error(), "escapes from parent") {
+    return fmt.Errorf("failed to open file: access denied: %w", ErrWorkspaceBoundary)
+}
+if os.IsPermission(err) || strings.Contains(err.Error(), "permission denied") {
+    return fmt.Errorf("failed to open file: permission denied: %w", err)
+}
+```
 
-- [ ] **Step 6: hostFs（1015/1039）不改 sentinel，改文案**
+- [ ] **Step 6: hostFs 不改 sentinel，改文案（1015/1039）**
 
 ```go
 // 1015:
@@ -601,19 +632,14 @@ return nil, fmt.Errorf("failed to read file: permission denied: %w", err)
 return nil, fmt.Errorf("failed to open file: permission denied: %w", err)
 ```
 
-- [ ] **Step 7: 编译验证**
+- [ ] **Step 7: 编译 + 测试**
 
 ```bash
 go build -tags goolm,stdjson ./pkg/tools/fs/...
-```
-
-- [ ] **Step 8: 运行测试**
-
-```bash
 go test -tags goolm,stdjson ./pkg/tools/fs/ -v
 ```
 
-- [ ] **Step 9: 提交**
+- [ ] **Step 8: 提交**
 
 ```bash
 git add pkg/tools/fs/filesystem.go
@@ -621,7 +647,7 @@ git commit -m "feat: filesystem ErrWorkspaceBoundary sentinel + 6 处挂载
 
 resolvePath ×3、getSafeRelPath ×1、sandboxFs ×2 共 6 处挂 ErrWorkspaceBoundary。
 hostFs OS 权限走普通 error，文案改为 permission denied 防 LLM 误判。
-sandboxFs 拆分 escapes from parent 与 os.IsPermission 分支。
+sandboxFs 拆分 3 条件：escapes from parent → sentinel，os.IsPermission + permission denied → 普通 error。
 
 Author: Holmir Chan <chenhaoming@talkweb.com.cn>
 Co-Authored-By: Claude Code"
@@ -633,10 +659,11 @@ Co-Authored-By: Claude Code"
 
 **文件:**
 - 修改: `pkg/tools/fs/filesystem.go`
+- 修改: `pkg/tools/fs/edit.go`
 
 - [ ] **Step 1: 添加 errorResultFromFS helper**
 
-在文件末尾添加：
+在 `pkg/tools/fs/filesystem.go` 文件末尾添加：
 
 ```go
 func errorResultFromFS(err error) *ToolResult {
@@ -655,32 +682,27 @@ func errorResultFromFSCtx(context string, err error) *ToolResult {
 }
 ```
 
-确保顶部 import 已有 `"errors"`。
+确保 `"errors"` 和 `"fmt"` 已在 import 中（filesystem.go 已有）。
 
 - [ ] **Step 2: 替换 6 处 Execute 层 ErrorResult**
 
-| 文件:行 | 替换 |
-|---------|------|
-| `edit.go:74` | `return ErrorResult(err.Error())` → `return errorResultFromFS(err)` |
-| `edit.go:128` | `return ErrorResult(err.Error())` → `return errorResultFromFS(err)` |
-| `filesystem.go:424` | `return ErrorResult(err.Error())` → `return errorResultFromFS(err)` |
-| `filesystem.go:572` | `return ErrorResult(err.Error())` → `return errorResultFromFS(err)` |
-| `filesystem.go:932` | `return ErrorResult(err.Error())` → `return errorResultFromFS(err)` |
-| `filesystem.go:979` | `return ErrorResult(fmt.Sprintf("failed to read directory: %v", err))` → `return errorResultFromFSCtx("failed to read directory", err)` |
+| 文件:行 | 原代码 | 替换为 |
+|---------|--------|--------|
+| `edit.go:74` | `return ErrorResult(err.Error())` | `return errorResultFromFS(err)` |
+| `edit.go:128` | `return ErrorResult(err.Error())` | `return errorResultFromFS(err)` |
+| `filesystem.go:424` | `return ErrorResult(err.Error())` | `return errorResultFromFS(err)` |
+| `filesystem.go:572` | `return ErrorResult(err.Error())` | `return errorResultFromFS(err)` |
+| `filesystem.go:932` | `return ErrorResult(err.Error())` | `return errorResultFromFS(err)` |
+| `filesystem.go:979` | `return ErrorResult(fmt.Sprintf("failed to read directory: %v", err))` | `return errorResultFromFSCtx("failed to read directory", err)` |
 
-- [ ] **Step 3: 编译验证**
+- [ ] **Step 3: 编译 + 测试**
 
 ```bash
 go build -tags goolm,stdjson ./pkg/tools/fs/...
-```
-
-- [ ] **Step 4: 运行测试**
-
-```bash
 go test -tags goolm,stdjson ./pkg/tools/fs/ -v
 ```
 
-- [ ] **Step 5: 提交**
+- [ ] **Step 4: 提交**
 
 ```bash
 git add pkg/tools/fs/filesystem.go pkg/tools/fs/edit.go
@@ -699,9 +721,11 @@ Co-Authored-By: Claude Code"
 
 **文件:**
 - 修改: `pkg/tools/shared/result_test.go`（追加测试）
-- 新建: `pkg/tools/fs/blocked_test.go`
+- 创建: `pkg/tools/fs/blocked_test.go`
 
 - [ ] **Step 1: ContentForLLM 前缀测试**
+
+在 `pkg/tools/shared/result_test.go` 追加：
 
 ```go
 func TestContentForLLM_BlockedTypePrefix(t *testing.T) {
@@ -734,7 +758,17 @@ func TestContentForLLM_NoPrefixOnNormalError(t *testing.T) {
 
 - [ ] **Step 2: ErrWorkspaceBoundary 传播测试**
 
+创建 `pkg/tools/fs/blocked_test.go`（package fstools）：
+
 ```go
+package fstools
+
+import (
+    "fmt"
+    "os"
+    "testing"
+)
+
 func TestErrorResultFromFS_DeniedBlockedType(t *testing.T) {
     err := fmt.Errorf("access denied: path is outside the workspace: %w", ErrWorkspaceBoundary)
     result := errorResultFromFS(err)
@@ -829,11 +863,10 @@ Co-Authored-By: Claude Code"
 go test -tags goolm,stdjson ./... -count=1
 ```
 
-- [ ] **Step 2: 全量构建**
+- [ ] **Step 2: 全量构建（Go + Web 后端）**
 
 ```bash
 make build && make build-launcher
-npx tsc --noEmit
 ```
 
 - [ ] **Step 3: 部署 RK3506 跑混合拦截场景**
