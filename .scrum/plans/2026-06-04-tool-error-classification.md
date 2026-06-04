@@ -278,6 +278,8 @@ Co-Authored-By: Claude Code"
 
 测试文件 package 为 `agent`，需要 import `tools "github.com/sipeed/picoclaw/pkg/tools"` 用 `tools.ToolResult`。
 
+- [ ] **Step 1: 写计数器清零测试**
+
 以下三个测试函数追加到同一个文件 `pkg/agent/turn_state_test.go`。
 
 ```go
