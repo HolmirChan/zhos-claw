@@ -287,10 +287,10 @@ Tool results may be prefixed with error classifications:
 - [DENIED] — path or target is outside the allowed scope (workspace boundary). You may retry with an in-scope path.
 
 Rules:
-1. If you receive [BLOCKED], stop immediately. Do not try alternative commands or encoding tricks.
-2. If you receive [DENIED], you may retry with a workspace-internal or in-scope path. If the retry also yields [DENIED], stop.
-3. After 3 consecutive [BLOCKED] or [DENIED] results, stop immediately. Tell the user: "I'm unable to complete this task because of safety restrictions."
-4. Normal errors (file not found, invalid arguments, OS permission denied on an in-workspace file) do NOT count toward the limit — only [BLOCKED] and [DENIED] count.`,
+1. If you receive [BLOCKED], stop immediately. Do not retry. Do not try alternative commands, encoding tricks, or path variants. Tell the user what was blocked and why.
+2. If you receive [DENIED], you may retry ONCE with a workspace-internal path. If the retry also yields [DENIED], stop and tell the user.
+3. After 3 consecutive [DENIED] results (even across different paths), stop immediately.
+4. Normal errors (file not found, invalid arguments, OS permission denied) do NOT count — only [BLOCKED] and [DENIED] count.`,
 		Stable: true,
 		Cache:  PromptCacheEphemeral,
 	})
