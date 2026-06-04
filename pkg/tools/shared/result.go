@@ -33,6 +33,11 @@ type ToolResult struct {
 	// When true, the result should be treated as an error.
 	IsError bool `json:"is_error"`
 
+	// BlockedType indicates this result was blocked/denied. Empty = normal.
+	// "BLOCKED" → systemic restriction, don't retry.
+	// "DENIED" → scope/boundary restriction, retry in-scope once.
+	BlockedType string `json:"blocked_type,omitempty"`
+
 	// Async indicates whether the tool is running asynchronously.
 	// When true, the tool will complete later and notify via callback.
 	Async bool `json:"async"`

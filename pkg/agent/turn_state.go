@@ -209,6 +209,11 @@ type turnState struct {
 	gracefulTerminalUsed  bool
 	hardAbort             bool
 	providerCancel        context.CancelFunc
+
+	// consecutiveBlockedCount tracks consecutive tools returning BlockedType != "".
+	// Reset to 0 on any non-blocked result (success or normal error). Reaching 5
+	// triggers a hard abort. SubTurn counters do NOT propagate to parent.
+	consecutiveBlockedCount int
 	turnCancel            context.CancelFunc
 
 	restorePointHistory []providers.Message
@@ -610,6 +615,29 @@ func (ts *turnState) hardAbortRequested() bool {
 	ts.mu.RLock()
 	defer ts.mu.RUnlock()
 	return ts.hardAbort
+}
+
+// recordToolResult updates the consecutive blocked counter based on tool result.
+// BlockedType non-empty → +1; BlockedType empty → reset to 0.
+// Reaching 5 consecutive blocked results triggers a hard abort.
+// No-op if hard abort already requested (defensive).
+func (ts *turnState) recordToolResult(tr *tools.ToolResult) {
+	ts.mu.Lock()
+	if ts.hardAbort {
+		ts.mu.Unlock()
+		return
+	}
+	if tr != nil && tr.BlockedType != "" {
+		ts.consecutiveBlockedCount++
+	} else {
+		ts.consecutiveBlockedCount = 0
+	}
+	shouldAbort := ts.consecutiveBlockedCount >= 5
+	ts.mu.Unlock()
+
+	if shouldAbort {
+		ts.requestHardAbort()
+	}
 }
 
 func (ts *turnState) eventMeta(source, tracePath string) HookMeta {
