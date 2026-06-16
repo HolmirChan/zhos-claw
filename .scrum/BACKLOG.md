@@ -4,7 +4,17 @@
 
 ## 待规划
 
-（空）
+### BL-012 · Web/HAP 端 Agent 任务主动中断
+- **意图**: Web 面板和 HAP 等外部客户端无法中断正在执行的 Agent 任务，用户只能手打 `/stop` 文本。核心引擎已有完整的三层中断能力（`HardAbort` / 优雅中断 / 钩子中止），只是没暴露给 Pico 协议层
+- **方案方向**: Pico 协议新增 `message.cancel` 客户端→服务端消息类型 → `pico.go` 处理并调用 `HardAbort()` → 前端控制器加 `cancelMessage()` → ChatComposer 在 Agent 回复时显示停止按钮。协议层补完后，HAP 只需发一条 WebSocket 消息即可中断
+- **设计文档**: -
+- **实现计划**: -
+
+### BL-013 · Seahorse 压缩可观测性
+- **意图**: 当前 Seahorse 压缩全自动静默运行，`CompactResult`（TokensSaved / LeafSummaries / CondensedSummaries）在 `context_seahorse.go:138` 被丢弃，压缩事件未接入事件总线，Web 端看不到任何压缩指标。压缩有没有做、效果好不好、摘要质量如何，完全无法评判，后续优化也无数据依据
+- **方案方向**: 三件事——① `seahorseContextManager.Compact()` 将 `CompactResult` 通过事件总线发送 `ContextCompressPayload`（补 `TokensSaved` 字段）；② `runtime_event_logger.go` 结构化记录压缩指标；③ Web 端会话详情页展示当前会话 token 用量（总 token / 压缩节省 / 摘要数），可做成可选的小型调试面板
+- **设计文档**: -
+- **实现计划**: -
 
 ## 已交付
 
